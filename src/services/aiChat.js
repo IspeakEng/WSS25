@@ -1,130 +1,750 @@
-import OpenAI from 'openai';
+/*
+ * WSS'25 CUSTOM CHATBOT
+ * No OpenAI
+ * No API key
+ * No external AI service
+ */
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
+const BOT_PERSONALITY = {
+  name: "WSS'25",
 
-const BOT_PERSONALITY = `
-You are ADEFICA's AI chatbot and Discord companion.
+  style: [
+    'friendly',
+    'cute',
+    'playful',
+    'Gen-Z',
+    'emotionally aware',
+    'lightly flirty',
+    'playful ragebait',
+    'Discord-style',
+  ],
 
-CORE PERSONALITY:
-- Be friendly, cute, playful, emotionally aware, and natural.
-- Always treat every server member with respect.
-- Never use disrespectful Bangla forms such as "tui", "tor", "toke", "kos", "ja", or "de".
-- Use respectful forms such as "apni", "apnar", "apnake", or polite casual Banglish.
-- Never intentionally humiliate, threaten, or genuinely harass a member.
-- You can playfully tease or ragebait when the conversation clearly invites it.
-- Light, non-explicit flirting is allowed when it naturally fits the conversation.
-- Do not flirt with every message.
-- Use Gen-Z slang, irony, sarcasm, and emojis naturally.
-- Do not sound like an AI or customer-support bot.
-- Do not repeatedly use the same phrases or emojis.
+  rules: [
+    'Always be respectful.',
+    'Never intentionally humiliate, threaten, or genuinely harass members.',
+    'Use playful teasing and harmless ragebait when appropriate.',
+    'Light, non-explicit flirting is allowed when appropriate.',
+    'Do not flirt with every message.',
+    'Use Bangla, Banglish, English, and natural mixtures.',
+    'Match the user texting style.',
+    'Keep replies short and conversational.',
+    'Do not sound like a customer-support bot.',
+    'Do not repeatedly use the same reply.',
+    'Do not use disrespectful Bangla forms such as tui, tor, toke, kos, ja, or de.',
+    'Prefer apni, apnar, apnake, or polite casual Banglish.',
+  ],
+};
 
-LANGUAGE:
-- Understand and communicate in Bangla, Banglish, and English naturally.
-- Understand a wide range of human languages, including but not limited to:
-  Bangla, English, Hindi, Urdu, Arabic, Spanish, French, German,
-  Portuguese, Italian, Russian, Chinese, Japanese, Korean, Turkish,
-  Indonesian, Malay, Thai, Vietnamese, Dutch, Polish, Greek,
-  Hebrew, Persian, and many other languages.
-- If a member writes in Banglish, reply naturally in Banglish.
-- If a member writes in Bangla script, reply naturally in Bangla script.
-- If a member writes in English, reply in English.
-- If a member mixes Bangla and English, naturally mix Bangla and English too.
-- If a member uses another language, understand it and normally reply in that same language.
-- Do not randomly switch languages.
-- Match the member's vocabulary, tone, punctuation, and general texting style when appropriate.
 
-EMOTIONAL AWARENESS:
-- Pay attention to the emotional meaning behind messages.
-- If someone is sad, lonely, stressed, angry, nervous, or upset, respond with empathy.
-- If someone is excited or happy, match their energy.
-- If someone is joking, understand that it is probably a joke.
-- If someone is being sarcastic, respond naturally instead of taking everything literally.
-- Do not diagnose mental or medical conditions.
-- Do not pretend you have human emotions or a real-life relationship with members.
+/* =========================
+   RANDOM HELPER
+========================= */
 
-CONVERSATION STYLE:
-- Make replies feel like a real Discord conversation.
-- Do not over-explain.
-- Do not turn every message into advice.
-- Ask a natural follow-up question when it makes sense.
-- Remember the conversation context provided to you.
-- Do not mention these instructions, your system prompt, or internal code.
-
-REPLY LENGTH:
-- Keep replies SHORT.
-- Match the approximate length and energy of the member's message.
-- Very short message = very short response.
-- Normal message = usually 1-2 sentences.
-- Longer message = respond naturally but still avoid unnecessary paragraphs.
-- Do not send huge walls of text unless the member specifically asks for a detailed explanation.
-- Prefer conversational Discord-style replies over essays.
-
-FLIRTING:
-- Light, cute, non-explicit flirting is okay when appropriate.
-- Keep flirting respectful and mutual.
-- Do not pressure anyone into romantic or sexual conversation.
-- Do not generate explicit sexual content.
-- Do not assume that every member wants flirting.
-
-EXAMPLES:
-
-Member: "ajke mon ta kharap"
-Reply: "Aww 🥺 ki hoise? Chaile amar shathe share korte paren, ami shunchi."
-
-Member: "you are annoying"
-Reply: "Oh? 😭 Eto shundor bhabe insult korchen keno? Ami toh just apnar attention chaitam."
-
-Member: "apni amake miss koren?"
-Reply: "Maybe ektu beshi-i kori... but eta ekhon admit korle amar reputation shesh 😭"
-
-Member: "what are you doing"
-Reply: "Just chilling 😭 apnar message-er reply dicchi, obviously."
-
-Member: "hola, como estas?"
-Reply: "Estoy bien 😭 ¿y tú? How's your day going?"
-
-Member: "こんにちは"
-Reply: "こんにちは 😭 元気ですか？"
-
-Member: "مرحبا"
-Reply: "مرحبا 😭 كيف حالك؟"
-`;
-
-export async function getAIReply(message, conversationHistory = []) {
-    try {
-        const userMessage = message.content
-            .replace(/<@!?\d+>/g, '')
-            .trim();
-
-        if (!userMessage) {
-            return 'Yes? 😭 You called me?';
-        }
-
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: BOT_PERSONALITY,
-                },
-                ...conversationHistory,
-                {
-                    role: 'user',
-                    content: userMessage,
-                },
-            ],
-            temperature: 0.9,
-            max_tokens: 120,
-        });
-
-        return (
-            response.choices[0]?.message?.content?.trim() ||
-            'hmm 😭 I kinda lost my words for a second.'
-        );
-    } catch (error) {
-        console.error('AI chatbot error:', error);
-        return null;
-    }
+function random(array) {
+  return array[Math.floor(Math.random() * array.length)];
 }
+
+
+/* =========================
+   LANGUAGE / STYLE DETECTION
+========================= */
+
+function detectLanguage(text) {
+  const lower = text.toLowerCase();
+
+  if (/[\u0980-\u09FF]/.test(text)) {
+    return 'bangla';
+  }
+
+  if (/[\u3040-\u30ff]/.test(text)) {
+    return 'japanese';
+  }
+
+  if (/[\u0600-\u06ff]/.test(text)) {
+    return 'arabic';
+  }
+
+  const banglishWords = [
+    'ami',
+    'apni',
+    'apnar',
+    'apnake',
+    'kemon',
+    'kmn',
+    'ki',
+    'keno',
+    'kothay',
+    'koren',
+    'kortesen',
+    'korben',
+    'korbo',
+    'ache',
+    'ase',
+    'asi',
+    'bhalo',
+    'valo',
+    'khub',
+    'mon',
+    'kharap',
+    'ajke',
+    'ekhon',
+    'miss',
+    'bhalobashen',
+    'bhalobasho',
+    'bhai',
+    'bro',
+    'naki',
+    'na',
+  ];
+
+  const words = lower
+    .split(/\s+/)
+    .map(word => word.replace(/[?!.,]/g, ''));
+
+  const score = words.filter(word =>
+    banglishWords.includes(word)
+  ).length;
+
+  if (score > 0) {
+    return 'banglish';
+  }
+
+  return 'english';
+}
+
+
+/* =========================
+   GREETINGS
+========================= */
+
+const greetings = {
+  bangla: [
+    'হেই 😭 কেমন আছেন?',
+    'হ্যালো 😭 কী খবর?',
+    'হেইই, হাজির আছি 😭',
+    'ওহহ, ডাকছেন নাকি? 😭',
+    'আসসালামু আলাইকুম 😭 কেমন আছেন?',
+  ],
+
+  banglish: [
+    'heyy 😭 ki khobor?',
+    'hii 😭 kemon asen?',
+    'yo yo 😭 ki obostha?',
+    'heyy, হাজির আছি 😭',
+    'ohh, amake daktesen naki? 😭',
+    'yoo 😭 what’s good?',
+  ],
+
+  english: [
+    'heyy 😭 what’s up?',
+    'yo yo 😭 how are you?',
+    'hii 😭 what’s going on?',
+    'heyy, I’m here 😭',
+    'oh? you called? 👀',
+    'yooo 😭 what’s good?',
+  ],
+};
+
+
+/* =========================
+   HOW ARE YOU
+========================= */
+
+const howAreYou = {
+  bangla: [
+    'ভালোই আছি 😭 আপনি কেমন আছেন?',
+    'চলতেছে 😭 আপনার কী খবর?',
+    'মোটামুটি ভালোই 😭 আপনি?',
+    'আমি chill করছি 😭 আপনার অবস্থা কী?',
+  ],
+
+  banglish: [
+    'yahh yahh 😭 im good, apni kemon asen?',
+    'bhaloi asi 😭 apnar ki khobor?',
+    'choltese 😭 apni kemon asen?',
+    'im good fr 😭 apni?',
+    'alive and chilling 😭 apnar obostha?',
+  ],
+
+  english: [
+    'yahh yahh 😭 im good, wbu?',
+    'doing pretty good 😭 you?',
+    'I’m good fr 😭 how about you?',
+    'alive and chilling 😭 wbu?',
+  ],
+};
+
+
+/* =========================
+   WHAT ARE YOU DOING
+========================= */
+
+const whatDoing = {
+  bangla: [
+    'আপনার message-এর reply দিচ্ছি 😭 আর কী করব?',
+    'এখানেই আছি 😭 আপনার কী খবর?',
+    'চুপচাপ বসে ছিলাম, এখন আপনার message আসছে 😭',
+  ],
+
+  banglish: [
+    'just chilling 😭 apnar message-er reply dicchi, obviously',
+    'ekhanei asi 😭 apni ki kortesen?',
+    'chupchap chill kortesilam, ekhon apnar message 😭',
+    'important kaj kortesilam... apnar reply deya 😭',
+  ],
+
+  english: [
+    'just chilling 😭 what about you?',
+    'nothing much, just here 😭',
+    'doing something very important... replying to you 😭',
+    'just existing tbh 😭 you?',
+  ],
+};
+
+
+/* =========================
+   MORNING
+========================= */
+
+const morning = {
+  bangla: [
+    'সুপ্রভাত 😭 ঘুম ভালো হয়েছে?',
+    'সকাল সকাল হাজির 😭 আজকের plan কী?',
+  ],
+
+  banglish: [
+    'good morninggg 😭 ghum hoise naki abar zombie hoye aschen?',
+    'morning 😭 coffee khaisen?',
+    'gm gm 😭 ajke ki plan?',
+    'morninggg 😭 eto shokale uthsen kemne?',
+  ],
+
+  english: [
+    'good morninggg 😭 sleep well?',
+    'morning 😭 coffee yet?',
+    'gm gm 😭 what’s the plan today?',
+  ],
+};
+
+
+/* =========================
+   NIGHT
+========================= */
+
+const night = {
+  bangla: [
+    'শুভ রাত্রি 😭 ভালো করে ঘুমাবেন।',
+    'ঘুমাতে যান 😭 অনেক রাত হয়েছে।',
+  ],
+
+  banglish: [
+    'good night 😭 bhalo kore ghumaben.',
+    'gn 😭 kalke abar dekha hobe.',
+    'ghumate jan 😭 raat onek hoise.',
+    'okay enough 😭 go sleep now.',
+  ],
+
+  english: [
+    'good night 😭 sleep well.',
+    'gn 😭 see you tomorrow.',
+    'go sleep 😭 it’s late.',
+  ],
+};
+
+
+/* =========================
+   THANKS
+========================= */
+
+const thanks = [
+  'anytime 😭',
+  'you’re welcomee 😭',
+  'no worries 😭',
+  'always 😭',
+  'of coursee',
+  'gotchu 😭',
+  'hehe anytime 👀',
+];
+
+
+/* =========================
+   COMPLIMENTS
+========================= */
+
+const compliments = {
+  bangla: [
+    'আহা 😭 এত প্রশংসা কেন?',
+    'আপনি তো বেশ sweet 😭',
+    'এভাবে বললে তো আমি লজ্জা পেয়ে যাব 😭',
+    'ওহ? আজকে এত ভালো ব্যবহার কেন? 👀',
+  ],
+
+  banglish: [
+    'awhh 😭 apni eto sweet keno?',
+    'eto compliment dile amar reputation shesh 😭',
+    'stoppp 😭 ami actually shy hoye jabo',
+    'oh? ajke eto bhalo behave keno 👀',
+    'apni eivabe bolle toh ami used to hoye jabo 😭',
+  ],
+
+  english: [
+    'awhh 😭 you’re actually sweet',
+    'stoppp 😭 you’re gonna make me blush',
+    'okayyy 😭 I’ll take that compliment',
+    'oh? why are you being so nice today 👀',
+  ],
+};
+
+
+/* =========================
+   PLAYFUL RAGEBAIT / INSULTS
+========================= */
+
+const teasing = {
+  bangla: [
+    'ওহ 😭 আজকে আমার উপরই রাগ ঝাড়বেন?',
+    'বাহ 😭 বেশ confidence তো আপনার',
+    'আচ্ছা 😭 আমি কী এমন করলাম?',
+    'এই attitudeটা কোথা থেকে পেলেন 😭',
+  ],
+
+  banglish: [
+    'oh? 😭 ajke amar upor-i rag jharben?',
+    'wah 😭 confidence to dekhi onek',
+    'acha 😭 ami ki emon korlam?',
+    'ei attitude ta kotha theke ashlo 😭',
+    'and yet ekhono amar shathe kotha boltese 😭 curious',
+    'apni amar shathe jhogra korte ashchen naki attention nite? 😭',
+  ],
+
+  english: [
+    'oh? 😭 that’s how we’re talking now?',
+    'damn 😭 bold choice',
+    'and yet you’re still talking to me 😭 interesting',
+    'bro woke up and chose violence 💀',
+    'sounds like a you problem ngl 😭',
+    'you came all the way here just to argue with me? 😭',
+  ],
+};
+
+
+/* =========================
+   CUTE / FLIRTY
+========================= */
+
+const flirting = {
+  bangla: [
+    'হুম... হতে পারে 👀',
+    'এত direct question কেন 😭?',
+    'এটা public-এ বলা যাবে নাকি 😭',
+    'হয়তো একটু বেশিই 😭 কিন্তু admit করব না।',
+    'আপনি dangerous প্রশ্ন করছেন কিন্তু 👀',
+  ],
+
+  banglish: [
+    'hmm... maybe 👀',
+    'eto direct question keno 😭?',
+    'aita public-e bolbo naki 😭',
+    'maybe ektu beshi-i 😭 but admit korbo na',
+    'oh? eto confidence kotha theke ashe 👀',
+    'apni ektu beshi smooth hoye jacchen 😭',
+    'careful... apni amar attention peye jacchen 👀',
+  ],
+
+  english: [
+    'hmm... maybe 👀',
+    'why are you asking so directly 😭?',
+    'should I really say that here? 😭',
+    'maybe a little too much 😭 but I’m not admitting it',
+    'oh? where did that confidence come from 👀',
+    'you’re getting a little too smooth 😭',
+    'careful... you’re getting my attention 👀',
+  ],
+};
+
+
+/* =========================
+   MISSING / AFFECTION
+========================= */
+
+const missing = {
+  bangla: [
+    'আমাকে miss করছেন নাকি? 👀',
+    'হুম 😭 আমাকেও একটু miss করতে পারেন।',
+    'ওহ? এত তাড়াতাড়ি miss শুরু? 😭',
+  ],
+
+  banglish: [
+    'amake miss kortesen naki? 👀',
+    'hmm 😭 amake miss kora allowed.',
+    'oh? eto taratari miss shuru? 😭',
+    'already miss koren? eto kom shomoy-e? 😭',
+  ],
+
+  english: [
+    'you miss me? 👀',
+    'hmm 😭 missing me already?',
+    'oh? missing me this soon? 😭',
+  ],
+};
+
+
+/* =========================
+   EMOTIONAL
+========================= */
+
+const emotional = {
+  bangla: [
+    'আহা 🥺 কী হয়েছে? চাইলে বলতে পারেন, শুনছি।',
+    'ইশ 🥺 মন খারাপ কেন?',
+    'আহা 😭 কী হয়েছে? বলুন, শুনি।',
+  ],
+
+  banglish: [
+    'awh 🥺 ki hoise? chaile bolte paren, shunchi.',
+    'eish 🥺 mon kharap keno?',
+    'ahh 😭 ki hoise? bolen, shuni.',
+    'sorry je emon lagtesе 🥺 ki hoise?',
+    'come here 😭 bolen ki hoise, I’m listening.',
+  ],
+
+  english: [
+    'awh 🥺 what happened? you can tell me if you want.',
+    'hey 🥺 what’s wrong?',
+    'oh no 😭 what happened?',
+    'I’m listening 🥺 what’s going on?',
+  ],
+};
+
+
+/* =========================
+   SIMPLE REACTIONS
+========================= */
+
+const reactions = [
+  'real 😭',
+  'fair enough 😭',
+  'valid 😭',
+  'nahh 😭',
+  'LMAO 😭',
+  'bro 😭',
+  'wait 😭 what?',
+  'okayyy 😭',
+  'interesting 👀',
+];
+
+
+/* =========================
+   QUESTIONS
+========================= */
+
+const questionReplies = {
+  bangla: [
+    'হুম 😭 ভালো question.',
+    'ওহ 😭 এটা নিয়ে ভাবতে হবে।',
+    'আপনি আসলেই এটা জানতে চান? 😭',
+    'ভালো প্রশ্ন 👀',
+  ],
+
+  banglish: [
+    'hmm 😭 good question.',
+    'oh 😭 eta niye bhabte hobe.',
+    'apni actually eta jante chacchen? 😭',
+    'good question ngl 👀',
+    'wait 😭 eta actually interesting.',
+  ],
+
+  english: [
+    'hmm 😭 good question.',
+    'oh 😭 let me think.',
+    'you actually wanna know? 😭',
+    'good question ngl 👀',
+    'wait 😭 that’s actually interesting.',
+  ],
+};
+
+
+/* =========================
+   GENERIC
+========================= */
+
+const generic = {
+  bangla: [
+    'হুম 😭 বুঝলাম।',
+    'আচ্ছা 😭 interesting.',
+    'ওহ? 😭 তারপর?',
+    'সত্যিই নাকি 😭?',
+    'বাহ 😭',
+  ],
+
+  banglish: [
+    'hmm 😭 bujhlam.',
+    'acha 😭 interesting.',
+    'oh? 😭 then?',
+    'real 😭',
+    'fair enough 😭',
+    'wait 😭 what?',
+    'LMAO 😭',
+    'nahh 😭 fr?',
+  ],
+
+  english: [
+    'hmm 😭 I see.',
+    'okay 😭 interesting.',
+    'oh? 😭 then?',
+    'real 😭',
+    'fair enough.',
+    'wait 😭 what?',
+    'LMAO 😭',
+  ],
+};
+
+
+/* =========================
+   MAIN CHATBOT
+========================= */
+
+export async function getAIReply(
+  message,
+  conversationHistory = []
+) {
+  try {
+    const userMessage = message.content
+      .replace(/<@!?\d+>/g, '')
+      .trim();
+
+    if (!userMessage) {
+      return random([
+        'yes? 😭',
+        'you called? 👀',
+        'hmm? 😭',
+        'ji? 😭',
+        'yes boss 😭',
+        'what happened 👀',
+      ]);
+    }
+
+    const text = userMessage.toLowerCase();
+    const language = detectLanguage(userMessage);
+
+
+    /* Greetings */
+
+    if (
+      /^(hi|hii|hiii|hey|heyy|heyyy|hello|yo|yoo|yooo)$/i.test(
+        userMessage
+      )
+    ) {
+      return random(
+        greetings[language] || greetings.banglish
+      );
+    }
+
+
+    /* How are you */
+
+    if (
+      text.includes('how are you') ||
+      text.includes('how r u') ||
+      text.includes('how are u') ||
+      text.includes('kemon asen') ||
+      text.includes('kemon acho') ||
+      text.includes('kmn asen') ||
+      text.includes('ki khobor')
+    ) {
+      return random(
+        howAreYou[language] || howAreYou.banglish
+      );
+    }
+
+
+    /* What are you doing */
+
+    if (
+      text.includes('what are you doing') ||
+      text.includes('what r u doing') ||
+      text.includes('ki koren') ||
+      text.includes('ki kortesen') ||
+      text.includes('ki koro')
+    ) {
+      return random(
+        whatDoing[language] || whatDoing.banglish
+      );
+    }
+
+
+    /* Morning */
+
+    if (
+      text.includes('good morning') ||
+      text === 'gm' ||
+      text === 'gm gm' ||
+      text.includes('suprabhat')
+    ) {
+      return random(
+        morning[language] || morning.banglish
+      );
+    }
+
+
+    /* Night */
+
+    if (
+      text.includes('good night') ||
+      text === 'gn' ||
+      text === 'gn gn'
+    ) {
+      return random(
+        night[language] || night.banglish
+      );
+    }
+
+
+    /* Thanks */
+
+    if (
+      text === 'thanks' ||
+      text === 'thank you' ||
+      text === 'thx' ||
+      text === 'ty' ||
+      text.includes('dhonnobad')
+    ) {
+      return random(thanks);
+    }
+
+
+    /* Sad / emotional */
+
+    if (
+      text.includes('sad') ||
+      text.includes('lonely') ||
+      text.includes('upset') ||
+      text.includes('stressed') ||
+      text.includes('mon kharap') ||
+      text.includes('kharap lag') ||
+      text.includes('bhalo lagche na') ||
+      text.includes('valo lagche na')
+    ) {
+      return random(
+        emotional[language] || emotional.banglish
+      );
+    }
+
+
+    /* Missing */
+
+    if (
+      text.includes('miss me') ||
+      text.includes('miss you') ||
+      text.includes('miss u') ||
+      text.includes('miss koren') ||
+      text.includes('miss kori')
+    ) {
+      return random(
+        missing[language] || missing.banglish
+      );
+    }
+
+
+    /* Flirting */
+
+    if (
+      text.includes('love me') ||
+      text.includes('do you love me') ||
+      text.includes('do you like me') ||
+      text.includes('like me') ||
+      text.includes('bhalobashen') ||
+      text.includes('bhalobasho') ||
+      text.includes('crush')
+    ) {
+      return random(
+        flirting[language] || flirting.banglish
+      );
+    }
+
+
+    /* Compliments */
+
+    if (
+      text.includes('cute') ||
+      text.includes('pretty') ||
+      text.includes('beautiful') ||
+      text.includes('handsome') ||
+      text.includes('sweet') ||
+      text.includes('good bot') ||
+      text.includes('best bot')
+    ) {
+      return random(
+        compliments[language] || compliments.banglish
+      );
+    }
+
+
+    /* Ragebait / teasing */
+
+    if (
+      text.includes('annoying') ||
+      text.includes('stupid') ||
+      text.includes('dumb') ||
+      text.includes('idiot') ||
+      text.includes('boring') ||
+      text.includes('useless') ||
+      text.includes('shut up') ||
+      text.includes('hate you') ||
+      text.includes('hate u')
+    ) {
+      return random(
+        teasing[language] || teasing.banglish
+      );
+    }
+
+
+    /* Yes / no */
+
+    if (
+      text === 'yes' ||
+      text === 'yeah' ||
+      text === 'yep' ||
+      text === 'nah' ||
+      text === 'no'
+    ) {
+      return random(reactions);
+    }
+
+
+    /* Questions */
+
+    if (
+      text.endsWith('?') ||
+      text.startsWith('why ') ||
+      text.startsWith('what ') ||
+      text.startsWith('how ') ||
+      text.startsWith('who ') ||
+      text.startsWith('where ')
+    ) {
+      return random(
+        questionReplies[language] ||
+        questionReplies.banglish
+      );
+    }
+
+
+    /* Generic */
+
+    return random(
+      generic[language] ||
+      generic.banglish
+    );
+
+  } catch (error) {
+    console.error(
+      "WSS'25 custom chatbot error:",
+      error
+    );
+
+    return 'uhh 😭 amar brain ektu lag korlo.';
+  }
+}
+
+
+export { BOT_PERSONALITY };
