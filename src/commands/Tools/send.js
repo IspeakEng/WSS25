@@ -1,4 +1,6 @@
-import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
+
+const OWNER_ID = '1054967242497982476';
 
 export default {
     data: new SlashCommandBuilder()
@@ -9,10 +11,16 @@ export default {
                 .setName('message')
                 .setDescription('The message you want the bot to send')
                 .setRequired(true)
-        )
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        ),
 
     async execute(interaction) {
+        if (interaction.user.id !== OWNER_ID) {
+            return interaction.reply({
+                content: '❌ You are not allowed to use this command.',
+                ephemeral: true
+            });
+        }
+
         const message = interaction.options.getString('message');
 
         await interaction.channel.send(message);
