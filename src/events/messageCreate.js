@@ -1,6 +1,5 @@
 import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
-import { getAIReply } from '../services/aiChat.js';
 
 import {
   getLevelingConfig,
@@ -22,8 +21,13 @@ import {
   resolveSubcommandAlias,
 } from '../config/commands/commandAliases.js';
 
-import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
-import { getGuildConfig } from '../services/config/guildConfig.js';
+import {
+  getPrefixRestriction,
+} from '../config/commands/prefixRestrictions.js';
+
+import {
+  getGuildConfig,
+} from '../services/config/guildConfig.js';
 
 import {
   getCommandPrefix,
@@ -39,7 +43,10 @@ import {
 } from '../utils/abuseProtection.js';
 
 import { createEmbed } from '../utils/embeds.js';
-import { isCommandEnabled } from '../services/commandAccessService.js';
+
+import {
+  isCommandEnabled,
+} from '../services/commandAccessService.js';
 
 import {
   getCountingGameConfig,
@@ -114,73 +121,9 @@ export default {
           }, 5000);
 
         } catch (error) {
+
           logger.error(
             'Failed to handle bad word message:',
-            error
-          );
-        }
-
-        return;
-      }
-
-
-      /*
-      |--------------------------------------------------------------------------
-      | WSS'25 CHATBOT
-      |--------------------------------------------------------------------------
-      |
-      | Anyone can talk to the bot by mentioning it.
-      | Owner/admin/member — everyone can use it.
-      |
-      | Example:
-      | @WSS'25 yo wassup?
-      |
-      |--------------------------------------------------------------------------
-      */
-
-      const botMentioned =
-        message.mentions.users.has(client.user.id);
-
-
-      if (botMentioned) {
-
-        try {
-
-          logger.info(
-            `${message.author.tag} mentioned WSS'25 in #${message.channel.name}`
-          );
-
-
-          const reply = await getAIReply(
-            message,
-            []
-          );
-
-
-          if (reply) {
-
-            await message.reply({
-              content: reply,
-              allowedMentions: {
-                repliedUser: false,
-              },
-            });
-
-          } else {
-
-            await message.reply({
-              content: 'hmm 😭 amar brain ektu lag korlo.',
-              allowedMentions: {
-                repliedUser: false,
-              },
-            });
-
-          }
-
-        } catch (error) {
-
-          logger.error(
-            "WSS'25 chatbot error:",
             error
           );
 
@@ -346,6 +289,11 @@ async function handlePrefixCommand(message, client) {
       resolveCommandAlias(
         commandName
       );
+
+
+    logger.info(
+      `Resolved command name: ${resolvedCommandName}`
+    );
 
 
     const command =
@@ -552,7 +500,7 @@ async function handlePrefixCommand(message, client) {
 
     /*
     |--------------------------------------------------------------------------
-    | EXECUTE
+    | EXECUTE COMMAND
     |--------------------------------------------------------------------------
     */
 
@@ -604,7 +552,9 @@ async function handleCountingGame(message, client) {
       !config.channelId ||
       message.channel.id !== config.channelId
     ) {
+
       return false;
+
     }
 
 
@@ -648,7 +598,11 @@ async function handleCountingGame(message, client) {
 
 
       setTimeout(() => {
-        failureMessage.delete().catch(() => {});
+
+        failureMessage
+          .delete()
+          .catch(() => {});
+
       }, 10000);
 
 
@@ -674,6 +628,7 @@ async function handleCountingGame(message, client) {
     );
 
     return false;
+
   }
 }
 
@@ -728,7 +683,9 @@ async function handleLeveling(message, client) {
         message.channel.id
       )
     ) {
+
       return;
+
     }
 
 
@@ -757,8 +714,11 @@ async function handleLeveling(message, client) {
             )
         )
       ) {
+
         return;
+
       }
+
     }
 
 
@@ -773,7 +733,9 @@ async function handleLeveling(message, client) {
         message.author.id
       )
     ) {
+
       return;
+
     }
 
 
@@ -787,7 +749,9 @@ async function handleLeveling(message, client) {
       !message.content ||
       message.content.trim().length === 0
     ) {
+
       return;
+
     }
 
 
@@ -828,7 +792,9 @@ async function handleLeveling(message, client) {
       timeSinceLastMessage <
       cooldownTime * 1000
     ) {
+
       return;
+
     }
 
 
@@ -851,7 +817,10 @@ async function handleLeveling(message, client) {
 
 
     const safeMinXP =
-      Math.max(1, minXP);
+      Math.max(
+        1,
+        minXP
+      );
 
 
     const safeMaxXP =
