@@ -85,8 +85,7 @@ export default {
 
       if (message.mentions.users.has('1054967242497982476')) {
         await message.react('1528022603770630185').catch(() => {});
-        await message.react('1523334663647658088').catch(() => {});
-        await message.react('✨').catch(() => {});
+        
       }
 
 
