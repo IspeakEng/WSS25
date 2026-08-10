@@ -55,16 +55,14 @@ import {
   recordCorrectCount,
 } from '../services/countingGameService.js';
 
-
 const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
 const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
 
-
 /*
- |--------------------------------------------------------------------------
- | MESSAGE CREATE
- |--------------------------------------------------------------------------
-*/
+ * ==========================================================================
+ * MESSAGE CREATE
+ * ==========================================================================
+ */
 
 export default {
   name: Events.MessageCreate,
@@ -78,28 +76,35 @@ export default {
       }
 
       /*
-       |--------------------------------------------------------------------------
-       | AUTO MENTION REACTIONS
-       |--------------------------------------------------------------------------
-      */
+       * ----------------------------------------------------------------------
+       * AUTO MENTION REACTION
+       * ----------------------------------------------------------------------
+       *
+       * React ONLY when Minhaz is directly mentioned.
+       * Do NOT react if the message is a reply.
+       */
 
-      if (message.mentions.users.has('1054967242497982476')) {
-        await message.react('1528022603770630185').catch(() => {});
-        
+      if (
+        message.mentions.users.has('1054967242497982476') &&
+        !message.reference
+      ) {
+        await message
+          .react('1528022603770630185')
+          .catch(() => {});
       }
 
 
       /*
-       |--------------------------------------------------------------------------
-       | BAD WORD FILTER
-       |--------------------------------------------------------------------------
-      */
+       * ----------------------------------------------------------------------
+       * BAD WORD FILTER
+       * ----------------------------------------------------------------------
+       */
 
       const badWords = [
         'fuck',
         'fucking',
         'motherfucker',
-        'shit',
+        'sexxy',
         'bitch',
         'bastard',
         'asshole',
@@ -117,14 +122,14 @@ export default {
         content.includes(word)
       );
 
-
       if (containsBadWord) {
         try {
 
           await message.delete();
 
           const warning = await message.channel.send({
-            content: `⚠️ ${message.author}, please keep the chat clean.`,
+            content:
+              `⚠️ ${message.author}, please keep the chat clean.`,
           });
 
           setTimeout(() => {
@@ -145,10 +150,10 @@ export default {
 
 
       /*
-       |--------------------------------------------------------------------------
-       | MESSAGE LOG
-       |--------------------------------------------------------------------------
-      */
+       * ----------------------------------------------------------------------
+       * MESSAGE LOG
+       * ----------------------------------------------------------------------
+       */
 
       logger.debug(
         `Message received from ${message.author.tag}: ${message.content}`
@@ -156,10 +161,10 @@ export default {
 
 
       /*
-       |--------------------------------------------------------------------------
-       | COUNTING GAME
-       |--------------------------------------------------------------------------
-      */
+       * ----------------------------------------------------------------------
+       * COUNTING GAME
+       * ----------------------------------------------------------------------
+       */
 
       const countingProcessed =
         await handleCountingGame(
@@ -173,10 +178,10 @@ export default {
 
 
       /*
-       |--------------------------------------------------------------------------
-       | PREFIX COMMAND
-       |--------------------------------------------------------------------------
-      */
+       * ----------------------------------------------------------------------
+       * PREFIX COMMAND
+       * ----------------------------------------------------------------------
+       */
 
       await handlePrefixCommand(
         message,
@@ -185,10 +190,10 @@ export default {
 
 
       /*
-       |--------------------------------------------------------------------------
-       | LEVELING
-       |--------------------------------------------------------------------------
-      */
+       * ----------------------------------------------------------------------
+       * LEVELING
+       * ----------------------------------------------------------------------
+       */
 
       await handleLeveling(
         message,
@@ -209,10 +214,10 @@ export default {
 
 
 /*
- |--------------------------------------------------------------------------
- | PREFIX COMMAND
- |--------------------------------------------------------------------------
-*/
+ * ==========================================================================
+ * PREFIX COMMAND
+ * ==========================================================================
+ */
 
 async function handlePrefixCommand(message, client) {
 
@@ -224,11 +229,9 @@ async function handlePrefixCommand(message, client) {
         message.guild.id
       );
 
-
     const prefix =
       guildConfig?.prefix ||
       getCommandPrefix();
-
 
     const parsed =
       parsePrefixCommand(
@@ -236,11 +239,9 @@ async function handlePrefixCommand(message, client) {
         prefix
       );
 
-
     if (!parsed) {
       return;
     }
-
 
     let {
       commandName,
@@ -249,14 +250,13 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | MUSIC SHORTCUTS
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * MUSIC SHORTCUTS
+     * ------------------------------------------------------------------------
+     */
 
     const musicPrefixShortcut =
       commandName.toLowerCase();
-
 
     const MUSIC_PREFIX_SHORTCUTS =
       new Set([
@@ -267,7 +267,6 @@ async function handlePrefixCommand(message, client) {
         'stop',
         'volume',
       ]);
-
 
     if (
       MUSIC_PREFIX_SHORTCUTS.has(
@@ -291,27 +290,24 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | RESOLVE COMMAND
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * RESOLVE COMMAND
+     * ------------------------------------------------------------------------
+     */
 
     const resolvedCommandName =
       resolveCommandAlias(
         commandName
       );
 
-
     logger.info(
       `Resolved command name: ${resolvedCommandName}`
     );
-
 
     const command =
       client.commands.get(
         resolvedCommandName
       );
-
 
     if (!command) {
 
@@ -324,10 +320,10 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | MAINTENANCE
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * MAINTENANCE
+     * ------------------------------------------------------------------------
+     */
 
     if (
       isMaintenanceMode() &&
@@ -352,10 +348,10 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | CATEGORY
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * CATEGORY
+     * ------------------------------------------------------------------------
+     */
 
     if (
       !isCommandCategoryEnabled(
@@ -381,10 +377,10 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | PREFIX RESTRICTION
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * PREFIX RESTRICTION
+     * ------------------------------------------------------------------------
+     */
 
     const restriction =
       getPrefixRestriction(
@@ -392,7 +388,6 @@ async function handlePrefixCommand(message, client) {
         args,
         resolveSubcommandAlias
       );
-
 
     if (
       !supportsPrefixExecution(command) ||
@@ -412,7 +407,6 @@ async function handlePrefixCommand(message, client) {
             color: 'info',
           });
 
-
         await message.channel.send({
           embeds: [embed],
         }).catch(() => {});
@@ -424,17 +418,16 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | COMMAND ENABLED
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * COMMAND ENABLED
+     * ------------------------------------------------------------------------
+     */
 
     const accessKey =
       resolvePrefixAccessKey(
         command.data,
         args
       );
-
 
     const commandEnabled =
       await isCommandEnabled(
@@ -443,7 +436,6 @@ async function handlePrefixCommand(message, client) {
         accessKey,
         command.category
       );
-
 
     if (!commandEnabled) {
 
@@ -455,7 +447,6 @@ async function handlePrefixCommand(message, client) {
           color: 'error',
         });
 
-
       await message.channel.send({
         embeds: [embed],
       }).catch(() => {});
@@ -465,16 +456,15 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | ABUSE PROTECTION
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * ABUSE PROTECTION
+     * ------------------------------------------------------------------------
+     */
 
     const mockInteractionForProtection = {
       guildId: message.guild.id,
       user: message.author,
     };
-
 
     const abuseProtection =
       await enforceAbuseProtection(
@@ -483,14 +473,12 @@ async function handlePrefixCommand(message, client) {
         resolvedCommandName
       );
 
-
     if (!abuseProtection.allowed) {
 
       const formattedCooldown =
         formatCooldownDuration(
           abuseProtection.remainingMs
         );
-
 
       const embed =
         createEmbed({
@@ -500,7 +488,6 @@ async function handlePrefixCommand(message, client) {
           color: 'error',
         });
 
-
       await message.channel.send({
         embeds: [embed],
       }).catch(() => {});
@@ -510,15 +497,14 @@ async function handlePrefixCommand(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | EXECUTE COMMAND
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * EXECUTE COMMAND
+     * ------------------------------------------------------------------------
+     */
 
     logger.info(
       `Executing prefix command: ${prefix}${commandName} (resolved to ${resolvedCommandName}) by ${message.author.tag}`
     );
-
 
     await executePrefixCommand(
       command,
@@ -528,7 +514,6 @@ async function handlePrefixCommand(message, client) {
       prefix,
       guildConfig
     );
-
 
   } catch (error) {
 
@@ -542,10 +527,10 @@ async function handlePrefixCommand(message, client) {
 
 
 /*
- |--------------------------------------------------------------------------
- | COUNTING GAME
- |--------------------------------------------------------------------------
-*/
+ * ==========================================================================
+ * COUNTING GAME
+ * ==========================================================================
+ */
 
 async function handleCountingGame(message, client) {
 
@@ -557,7 +542,6 @@ async function handleCountingGame(message, client) {
         message.guild.id
       );
 
-
     if (
       !config.enabled ||
       !config.channelId ||
@@ -565,13 +549,11 @@ async function handleCountingGame(message, client) {
     ) {
 
       return false;
-
     }
 
 
     const content =
       message.content.trim();
-
 
     const validCount =
       isValidCountingMessage(
@@ -579,16 +561,13 @@ async function handleCountingGame(message, client) {
         config
       );
 
-
     const invalidAttempt =
       !validCount ||
       message.author.id === config.lastUserId;
 
-
     if (invalidAttempt) {
 
       await message.delete().catch(() => {});
-
 
       await saveCountingGameConfig(
         client,
@@ -601,12 +580,10 @@ async function handleCountingGame(message, client) {
         }
       );
 
-
       const failureMessage =
         await message.channel.send(
           `❌ Count broken by <@${message.author.id}>. The sequence has been reset to **1**.`
         );
-
 
       setTimeout(() => {
 
@@ -615,7 +592,6 @@ async function handleCountingGame(message, client) {
           .catch(() => {});
 
       }, 10000);
-
 
       return true;
     }
@@ -627,9 +603,7 @@ async function handleCountingGame(message, client) {
       message.author.id
     );
 
-
     return true;
-
 
   } catch (error) {
 
@@ -639,16 +613,15 @@ async function handleCountingGame(message, client) {
     );
 
     return false;
-
   }
 }
 
 
 /*
- |--------------------------------------------------------------------------
- | LEVELING
- |--------------------------------------------------------------------------
-*/
+ * ==========================================================================
+ * LEVELING
+ * ==========================================================================
+ */
 
 async function handleLeveling(message, client) {
 
@@ -657,14 +630,12 @@ async function handleLeveling(message, client) {
     const rateLimitKey =
       `xp-event:${message.guild.id}:${message.author.id}`;
 
-
     const canProcess =
       await checkRateLimit(
         rateLimitKey,
         MESSAGE_XP_RATE_LIMIT_ATTEMPTS,
         MESSAGE_XP_RATE_LIMIT_WINDOW_MS
       );
-
 
     if (!canProcess) {
       return;
@@ -677,17 +648,16 @@ async function handleLeveling(message, client) {
         message.guild.id
       );
 
-
     if (!levelingConfig?.enabled) {
       return;
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | IGNORED CHANNELS
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * IGNORED CHANNELS
+     * ------------------------------------------------------------------------
+     */
 
     if (
       levelingConfig.ignoredChannels?.includes(
@@ -696,15 +666,14 @@ async function handleLeveling(message, client) {
     ) {
 
       return;
-
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | IGNORED ROLES
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * IGNORED ROLES
+     * ------------------------------------------------------------------------
+     */
 
     if (
       levelingConfig.ignoredRoles?.length > 0
@@ -714,7 +683,6 @@ async function handleLeveling(message, client) {
         await message.guild.members
           .fetch(message.author.id)
           .catch(() => null);
-
 
       if (
         member &&
@@ -727,17 +695,15 @@ async function handleLeveling(message, client) {
       ) {
 
         return;
-
       }
-
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | BLACKLISTED USERS
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * BLACKLISTED USERS
+     * ------------------------------------------------------------------------
+     */
 
     if (
       levelingConfig.blacklistedUsers?.includes(
@@ -746,15 +712,14 @@ async function handleLeveling(message, client) {
     ) {
 
       return;
-
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | EMPTY MESSAGE
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * EMPTY MESSAGE
+     * ------------------------------------------------------------------------
+     */
 
     if (
       !message.content ||
@@ -762,15 +727,14 @@ async function handleLeveling(message, client) {
     ) {
 
       return;
-
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | USER DATA
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * USER DATA
+     * ------------------------------------------------------------------------
+     */
 
     const userData =
       await getUserLevelData(
@@ -781,23 +745,20 @@ async function handleLeveling(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | XP COOLDOWN
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * XP COOLDOWN
+     * ------------------------------------------------------------------------
+     */
 
     const cooldownTime =
       levelingConfig.xpCooldown || 60;
 
-
     const now =
       Date.now();
-
 
     const timeSinceLastMessage =
       now -
       (userData.lastMessage || 0);
-
 
     if (
       timeSinceLastMessage <
@@ -805,27 +766,24 @@ async function handleLeveling(message, client) {
     ) {
 
       return;
-
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | XP RANGE
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * XP RANGE
+     * ------------------------------------------------------------------------
+     */
 
     const minXP =
       levelingConfig.xpRange?.min ||
       levelingConfig.xpPerMessage?.min ||
       15;
 
-
     const maxXP =
       levelingConfig.xpRange?.max ||
       levelingConfig.xpPerMessage?.max ||
       25;
-
 
     const safeMinXP =
       Math.max(
@@ -833,13 +791,11 @@ async function handleLeveling(message, client) {
         minXP
       );
 
-
     const safeMaxXP =
       Math.max(
         safeMinXP,
         maxXP
       );
-
 
     const xpToGive =
       Math.floor(
@@ -849,14 +805,13 @@ async function handleLeveling(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | XP MULTIPLIER
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * XP MULTIPLIER
+     * ------------------------------------------------------------------------
+     */
 
     let finalXP =
       xpToGive;
-
 
     if (
       levelingConfig.xpMultiplier &&
@@ -868,15 +823,14 @@ async function handleLeveling(message, client) {
           finalXP *
           levelingConfig.xpMultiplier
         );
-
     }
 
 
     /*
-     |--------------------------------------------------------------------------
-     | ADD XP
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * ADD XP
+     * ------------------------------------------------------------------------
+     */
 
     const result =
       await addXp(
@@ -888,10 +842,10 @@ async function handleLeveling(message, client) {
 
 
     /*
-     |--------------------------------------------------------------------------
-     | LEVEL UP
-     |--------------------------------------------------------------------------
-    */
+     * ------------------------------------------------------------------------
+     * LEVEL UP
+     * ------------------------------------------------------------------------
+     */
 
     if (result?.leveledUp) {
 
@@ -900,7 +854,6 @@ async function handleLeveling(message, client) {
       );
 
     }
-
 
   } catch (error) {
 
