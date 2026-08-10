@@ -24,7 +24,7 @@ export const botConfig = {
     activities: [
       {
         name: "", // required by Discord API, not shown in the client
-        state: "GTA 6",     // this is what people actually see
+        state: "noir",     // this is what people actually see
         type: 0,
       },
     ],
