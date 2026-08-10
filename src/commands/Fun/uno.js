@@ -1,3 +1,4 @@
+```js
 import {
   SlashCommandBuilder,
   ChannelType,
@@ -8,6 +9,10 @@ import {
   EmbedBuilder,
   PermissionFlagsBits,
 } from 'discord.js';
+
+// ============================================================
+// UNO CONFIG
+// ============================================================
 
 const games = new Map();
 const unoChannels = new Map();
@@ -37,6 +42,10 @@ const CARD_NAMES = {
   wild: 'Wild',
   wild4: '+4',
 };
+
+// ============================================================
+// DECK
+// ============================================================
 
 function shuffle(array) {
   const result = [...array];
@@ -75,16 +84,17 @@ function createDeck() {
   return shuffle(deck);
 }
 
+// ============================================================
+// CARD HELPERS
+// ============================================================
+
 function cardText(card) {
   if (!card) return 'None';
 
-  if (card.color === 'wild') {
-    return `${COLOR_EMOJI.wild} ${CARD_NAMES[card.value]}`;
-  }
+  const emoji = COLOR_EMOJI[card.color] || '🃏';
+  const name = CARD_NAMES[card.value] || card.value;
 
-  return `${COLOR_EMOJI[card.color]} ${
-    CARD_NAMES[card.value] || card.value
-  }`;
+  return `${emoji} ${name}`;
 }
 
 function cardLabel(card) {
@@ -101,28 +111,38 @@ function canPlay(card, topCard, currentColor) {
   if (!card || !topCard) return false;
 
   if (card.color === 'wild') return true;
-
   if (card.color === currentColor) return true;
-
   if (card.value === topCard.value) return true;
 
   return false;
 }
 
+// ============================================================
+// GAME
+// ============================================================
+
 function createGame(channelId, hostId) {
   const game = {
     channelId,
     hostId,
+
     players: [],
     hands: new Map(),
+
     deck: [],
     discard: [],
+
     currentColor: null,
     turnIndex: 0,
     direction: 1,
+
     started: false,
+    solo: false,
+
     message: null,
     collector: null,
+
+    pendingWild: new Map(),
   };
 
   games.set(channelId, game);
@@ -167,8 +187,8 @@ function drawCards(game, amount) {
 }
 
 function dealCards(game) {
-  for (const player of game.players) {
-    game.hands.set(player, drawCards(game, 7));
+  for (const playerId of game.players) {
+    game.hands.set(playerId, drawCards(game, 7));
   }
 
   let firstCard;
@@ -191,6 +211,10 @@ function dealCards(game) {
   }
 }
 
+// ============================================================
+// EMBED
+// ============================================================
+
 function buildGameEmbed(game) {
   const topCard = game.discard.at(-1);
 
@@ -205,7 +229,7 @@ function buildGameEmbed(game) {
         : `<@${player}>`;
   }
 
-  const players =
+  const playerList =
     game.players.length > 0
       ? game.players
           .map((player) =>
@@ -230,32 +254,38 @@ function buildGameEmbed(game) {
         : [
             'Join the game and wait for everyone.',
             '',
-            '**1 player:** You vs Bot',
+            '**1 player:** You vs 🤖 Bot',
             '**2–10 players:** Humans only',
           ].join('\n')
     )
     .addFields({
       name: `Players (${game.players.length}/${MAX_PLAYERS})`,
-      value: players,
+      value: playerList,
     });
 
   if (game.started) {
+    const counts = game.players
+      .map((player) => {
+        const hand = game.hands.get(player) || [];
+
+        return player === 'BOT'
+          ? `🤖 Bot — **${hand.length}** cards`
+          : `<@${player}> — **${hand.length}** cards`;
+      })
+      .join('\n');
+
     embed.addFields({
       name: 'Cards Remaining',
-      value: game.players
-        .map((player) => {
-          const hand = game.hands.get(player) || [];
-
-          return player === 'BOT'
-            ? `🤖 Bot — **${hand.length}** cards`
-            : `<@${player}> — **${hand.length}** cards`;
-        })
-        .join('\n'),
+      value: counts || 'None',
     });
   }
 
   return embed;
 }
+
+// ============================================================
+// BUTTONS
+// ============================================================
 
 function lobbyButtons() {
   return new ActionRowBuilder().addComponents(
@@ -303,6 +333,10 @@ function gameButtons() {
   ];
 }
 
+// ============================================================
+// SELECT MENUS
+// ============================================================
+
 function cardSelectMenu(game, playerId) {
   const hand = game.hands.get(playerId) || [];
   const topCard = game.discard.at(-1);
@@ -344,6 +378,10 @@ function colorSelectMenu() {
   );
 }
 
+// ============================================================
+// UPDATE
+// ============================================================
+
 async function updateGameMessage(game) {
   if (!game.message) return;
 
@@ -357,30 +395,43 @@ async function updateGameMessage(game) {
   } catch {}
 }
 
-async function endGame(game, text) {
+// ============================================================
+// END GAME
+// ============================================================
+
+async function endGame(game, message) {
+  game.started = false;
+
   if (game.collector) {
     game.collector.stop();
   }
 
   games.delete(game.channelId);
 
+  if (!game.message) return;
+
   try {
-    await game.message?.edit({
+    await game.message.edit({
       embeds: [
         new EmbedBuilder()
           .setTitle('🃏 UNO — Game Over')
-          .setDescription(text),
+          .setDescription(message),
       ],
       components: [],
     });
   } catch {}
 }
 
+// ============================================================
+// START
+// ============================================================
+
 async function startGame(game) {
   if (game.started) return;
 
   if (game.players.length === 1) {
     game.players.push('BOT');
+    game.solo = true;
   }
 
   if (game.players.length < 2) {
@@ -403,7 +454,30 @@ async function startGame(game) {
   game.direction = 1;
 }
 
-async function playCard(game, playerId, index, interaction) {
+// ============================================================
+// REMOVE CARD
+// ============================================================
+
+function removeCard(game, playerId, index) {
+  const hand = game.hands.get(playerId);
+
+  if (!hand || !hand[index]) return null;
+
+  return hand.splice(index, 1)[0];
+}
+
+// ============================================================
+// PLAY CARD
+// ============================================================
+
+async function playCard(game, playerId, cardIndex, interaction) {
+  if (!game.started) {
+    return interaction.reply({
+      content: '❌ The game has not started.',
+      ephemeral: true,
+    });
+  }
+
   if (currentPlayer(game) !== playerId) {
     return interaction.reply({
       content: '❌ It is not your turn.',
@@ -412,7 +486,7 @@ async function playCard(game, playerId, index, interaction) {
   }
 
   const hand = game.hands.get(playerId);
-  const card = hand?.[index];
+  const card = hand?.[cardIndex];
 
   if (!card) {
     return interaction.reply({
@@ -431,21 +505,38 @@ async function playCard(game, playerId, index, interaction) {
   }
 
   if (card.color === 'wild') {
+    game.pendingWild.set(playerId, cardIndex);
+
     return interaction.reply({
-      content: `You played **${cardText(card)}**.\nChoose a color:`,
+      content: `You played **${cardText(card)}**.\nChoose the new color:`,
       components: [colorSelectMenu()],
       ephemeral: true,
     });
   }
 
-  hand.splice(index, 1);
+  removeCard(game, playerId, cardIndex);
+
   game.discard.push(card);
   game.currentColor = card.color;
 
-  await finishTurn(game, playerId, card, interaction);
+  await finishTurnAfterCard(
+    game,
+    playerId,
+    card,
+    interaction
+  );
 }
 
-async function finishTurn(game, playerId, card, interaction) {
+// ============================================================
+// FINISH TURN
+// ============================================================
+
+async function finishTurnAfterCard(
+  game,
+  playerId,
+  card,
+  interaction
+) {
   const hand = game.hands.get(playerId);
 
   if (hand.length === 0) {
@@ -454,7 +545,22 @@ async function finishTurn(game, playerId, card, interaction) {
         ? '🤖 **Bot wins!**'
         : `🏆 **<@${playerId}> wins!**`;
 
-    return endGame(game, winner);
+    await endGame(game, winner);
+
+    if (!interaction.replied && !interaction.deferred) {
+      try {
+        await interaction.update({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('🃏 UNO — Game Over')
+              .setDescription(winner),
+          ],
+          components: [],
+        });
+      } catch {}
+    }
+
+    return;
   }
 
   let skip = false;
@@ -477,6 +583,11 @@ async function finishTurn(game, playerId, card, interaction) {
     skip = true;
   }
 
+  if (card.value === 'wild4') {
+    drawAmount = 4;
+    skip = true;
+  }
+
   nextTurn(game);
 
   if (skip) {
@@ -487,7 +598,7 @@ async function finishTurn(game, playerId, card, interaction) {
 
   if (drawAmount > 0 && nextPlayer !== 'BOT') {
     const cards = drawCards(game, drawAmount);
-    game.hands.get(nextPlayer)?.push(...cards);
+    game.hands.get(nextPlayer).push(...cards);
   }
 
   await updateGameMessage(game);
@@ -506,28 +617,45 @@ async function finishTurn(game, playerId, card, interaction) {
   }
 }
 
-async function playWild(game, playerId, color, interaction) {
+// ============================================================
+// WILD
+// ============================================================
+
+async function playWildAfterColor(
+  game,
+  playerId,
+  color,
+  interaction
+) {
+  if (!game.started) {
+    return interaction.update({
+      content: '❌ The game has already ended.',
+      components: [],
+    });
+  }
+
+  if (currentPlayer(game) !== playerId) {
+    return interaction.update({
+      content: '❌ It is not your turn.',
+      components: [],
+    });
+  }
+
   const hand = game.hands.get(playerId);
+  const cardIndex = game.pendingWild.get(playerId);
 
-  if (!hand || currentPlayer(game) !== playerId) {
+  const card = hand?.[cardIndex];
+
+  if (!card || card.color !== 'wild') {
     return interaction.update({
-      content: '❌ This action is no longer valid.',
+      content: '❌ Wild card is no longer available.',
       components: [],
     });
   }
 
-  const index = hand.findIndex(
-    (card) => card.color === 'wild'
-  );
+  game.pendingWild.delete(playerId);
 
-  if (index === -1) {
-    return interaction.update({
-      content: '❌ Wild card not found.',
-      components: [],
-    });
-  }
-
-  const card = hand.splice(index, 1)[0];
+  removeCard(game, playerId, cardIndex);
 
   game.discard.push(card);
   game.currentColor = color;
@@ -537,7 +665,7 @@ async function playWild(game, playerId, color, interaction) {
     components: [],
   });
 
-  await finishTurn(game, playerId, card, {
+  const fakeInteraction = {
     replied: true,
     deferred: false,
     update: async (data) => {
@@ -545,18 +673,28 @@ async function playWild(game, playerId, color, interaction) {
         await game.message.edit(data);
       } catch {}
     },
-  });
+  };
+
+  await finishTurnAfterCard(
+    game,
+    playerId,
+    card,
+    fakeInteraction
+  );
 }
 
+// ============================================================
+// BOT
+// ============================================================
+
 async function botTurn(game) {
-  if (!game.started || currentPlayer(game) !== 'BOT') {
-    return;
-  }
+  if (!game.started) return;
+  if (currentPlayer(game) !== 'BOT') return;
 
   const hand = game.hands.get('BOT') || [];
   const topCard = game.discard.at(-1);
 
-  let playable = hand
+  const playable = hand
     .map((card, index) => ({ card, index }))
     .filter(({ card }) =>
       canPlay(card, topCard, game.currentColor)
@@ -566,75 +704,90 @@ async function botTurn(game) {
     const drawn = drawCards(game, 1);
 
     if (drawn.length > 0) {
-      hand.push(drawn[0]);
+      const drawnCard = drawn[0];
+
+      hand.push(drawnCard);
 
       if (
         canPlay(
-          drawn[0],
+          drawnCard,
           topCard,
           game.currentColor
         )
       ) {
-        playable = [
-          {
-            card: drawn[0],
-            index: hand.length - 1,
-          },
-        ];
+        await botPlay(game, hand.length - 1);
+        return;
       }
     }
-  }
 
-  if (playable.length === 0) {
     nextTurn(game);
+
     await updateGameMessage(game);
+
     return;
   }
 
-  const normal = playable.filter(
+  const normalCards = playable.filter(
     ({ card }) => card.color !== 'wild'
   );
 
   const choice =
-    normal.length > 0
-      ? normal[Math.floor(Math.random() * normal.length)]
-      : playable[Math.floor(Math.random() * playable.length)];
+    normalCards.length > 0
+      ? normalCards[
+          Math.floor(Math.random() * normalCards.length)
+        ]
+      : playable[
+          Math.floor(Math.random() * playable.length)
+        ];
 
-  const card = hand.splice(choice.index, 1)[0];
+  await botPlay(game, choice.index);
+}
+
+async function botPlay(game, cardIndex) {
+  const hand = game.hands.get('BOT');
+
+  const card = removeCard(
+    game,
+    'BOT',
+    cardIndex
+  );
+
+  if (!card) return;
 
   game.discard.push(card);
 
   if (card.color === 'wild') {
-    const counts = {};
+    const colorCounts = {};
 
     for (const c of hand) {
       if (c.color !== 'wild') {
-        counts[c.color] = (counts[c.color] || 0) + 1;
+        colorCounts[c.color] =
+          (colorCounts[c.color] || 0) + 1;
       }
     }
 
+    const bestColor =
+      Object.entries(colorCounts)
+        .sort((a, b) => b[1] - a[1])[0]?.[0];
+
     game.currentColor =
-      Object.entries(counts)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] ||
+      bestColor ||
       COLORS[Math.floor(Math.random() * COLORS.length)];
   } else {
     game.currentColor = card.color;
   }
 
-  await finishBotTurn(game, card);
-}
-
-async function finishBotTurn(game, card) {
-  const hand = game.hands.get('BOT');
-
   if (hand.length === 0) {
-    return endGame(game, '🤖 **Bot wins!**');
+    await endGame(game, '🤖 **Bot wins!**');
+    return;
   }
 
   let skip = false;
   let drawAmount = 0;
 
-  if (card.value === 'skip') skip = true;
+  if (card.value === 'skip') {
+    skip = true;
+  }
 
   if (card.value === 'reverse') {
     if (game.players.length === 2) {
@@ -649,6 +802,11 @@ async function finishBotTurn(game, card) {
     skip = true;
   }
 
+  if (card.value === 'wild4') {
+    drawAmount = 4;
+    skip = true;
+  }
+
   nextTurn(game);
 
   if (skip) {
@@ -658,9 +816,11 @@ async function finishBotTurn(game, card) {
   const nextPlayer = currentPlayer(game);
 
   if (drawAmount > 0 && nextPlayer !== 'BOT') {
+    const cards = drawCards(game, drawAmount);
+
     game.hands
       .get(nextPlayer)
-      ?.push(...drawCards(game, drawAmount));
+      .push(...cards);
   }
 
   await updateGameMessage(game);
@@ -670,19 +830,29 @@ async function finishBotTurn(game, card) {
   }
 }
 
+// ============================================================
+// HELP
+// ============================================================
+
 function helpEmbed() {
   return new EmbedBuilder()
     .setTitle('🃏 UNO Help')
     .setDescription(
       [
+        '**Commands**',
+        '',
+        '`/uno play` → Start a new UNO game',
+        '`/uno setup` → Set the UNO channel',
+        '`/uno help` → Show this help',
+        '',
         '**How to play**',
         '',
-        '1️⃣ Use `/uno` to create a game.',
-        '2️⃣ Click **Join Game**.',
-        '3️⃣ Host clicks **Start Game**.',
-        '4️⃣ Match color or number.',
+        '1️⃣ Create a game with `/uno play`.',
+        '2️⃣ Other members click **Join Game**.',
+        '3️⃣ The creator clicks **Start Game**.',
+        '4️⃣ Match the top card by color or value.',
         '5️⃣ Use **Draw Card** when needed.',
-        '6️⃣ Press **UNO!** with 1 card.',
+        '6️⃣ Press **UNO!** when you have 1 card.',
         '7️⃣ First player with 0 cards wins.',
         '',
         '**Players**',
@@ -690,19 +860,31 @@ function helpEmbed() {
         '👥 2–10 players → Humans only',
         '',
         '**Special Cards**',
-        '⏭️ Skip',
-        '🔄 Reverse',
-        '➕ +2',
-        '🌈 Wild',
-        '💥 +4',
+        '⏭️ **Skip** → Skip the next player.',
+        '🔄 **Reverse** → Reverse turn order.',
+        '➕ **+2** → Next player draws 2.',
+        '🌈 **Wild** → Choose a color.',
+        '💥 **+4** → Choose a color and next player draws 4.',
       ].join('\n')
-    );
+    )
+    .setFooter({
+      text: "Good luck! Don't forget UNO!",
+    });
 }
+
+// ============================================================
+// SLASH COMMAND
+// ============================================================
 
 export default {
   data: new SlashCommandBuilder()
     .setName('uno')
     .setDescription('Play UNO')
+    .addSubcommand((sub) =>
+      sub
+        .setName('play')
+        .setDescription('Start a new UNO game')
+    )
     .addSubcommand((sub) =>
       sub
         .setName('setup')
@@ -722,14 +904,25 @@ export default {
     ),
 
   async execute(interaction) {
-    const subcommand = interaction.options.getSubcommand();
+    const subcommand =
+      interaction.options.getSubcommand();
+
+    // ========================================================
+    // HELP
+    // ========================================================
 
     if (subcommand === 'help') {
-      return interaction.reply({
+      await interaction.reply({
         embeds: [helpEmbed()],
         ephemeral: true,
       });
+
+      return;
     }
+
+    // ========================================================
+    // SETUP
+    // ========================================================
 
     if (subcommand === 'setup') {
       if (
@@ -737,11 +930,13 @@ export default {
           PermissionFlagsBits.ManageGuild
         )
       ) {
-        return interaction.reply({
+        await interaction.reply({
           content:
-            '❌ You need **Manage Server** permission.',
+            '❌ Only members with **Manage Server** permission can set the UNO channel.',
           ephemeral: true,
         });
+
+        return;
       }
 
       const channel =
@@ -752,105 +947,329 @@ export default {
         channel.id
       );
 
-      return interaction.reply({
+      await interaction.reply({
         content:
-          `✅ UNO channel set to ${channel}.\nUse \`/uno\` there to start a game.`,
+          `✅ UNO channel set to ${channel}.\n\nUse \`/uno play\` in that channel to start a game.`,
         ephemeral: true,
       });
+
+      return;
     }
 
-    const selectedChannel =
-      unoChannels.get(interaction.guildId);
+    // ========================================================
+    // PLAY
+    // ========================================================
 
-    if (!selectedChannel) {
-      return interaction.reply({
-        content:
-          '❌ UNO has not been configured yet.\nUse `/uno setup` first.',
-        ephemeral: true,
-      });
-    }
+    if (subcommand === 'play') {
+      const selectedChannel =
+        unoChannels.get(interaction.guildId);
 
-    if (interaction.channelId !== selectedChannel) {
-      return interaction.reply({
-        content:
-          `❌ UNO can only be played in <#${selectedChannel}>.`,
-        ephemeral: true,
-      });
-    }
+      if (!selectedChannel) {
+        await interaction.reply({
+          content:
+            '❌ UNO has not been configured yet.\n\nAsk a server manager to use:\n`/uno setup channel:#channel`',
+          ephemeral: true,
+        });
 
-    if (games.has(interaction.channelId)) {
-      return interaction.reply({
-        content:
-          '❌ There is already an UNO game running here.',
-        ephemeral: true,
-      });
-    }
+        return;
+      }
 
-    const game = createGame(
-      interaction.channelId,
-      interaction.user.id
-    );
+      if (
+        interaction.channelId !== selectedChannel
+      ) {
+        await interaction.reply({
+          content:
+            `❌ UNO can only be played in <#${selectedChannel}>.`,
+          ephemeral: true,
+        });
 
-    game.players.push(interaction.user.id);
+        return;
+      }
 
-    const message = await interaction.reply({
-      embeds: [buildGameEmbed(game)],
-      components: [lobbyButtons()],
-      fetchReply: true,
-    });
+      if (games.has(interaction.channelId)) {
+        await interaction.reply({
+          content:
+            '❌ There is already an UNO game running in this channel.',
+          ephemeral: true,
+        });
 
-    game.message = message;
+        return;
+      }
 
-    const collector =
-      message.createMessageComponentCollector({
-        time: 30 * 60 * 1000,
-      });
+      // ======================================================
+      // CREATE GAME
+      // ======================================================
 
-    game.collector = collector;
+      const game = createGame(
+        interaction.channelId,
+        interaction.user.id
+      );
 
-    collector.on('collect', async (component) => {
-      try {
-        if (component.customId === 'uno_join') {
-          if (game.started) {
-            return component.reply({
-              content: '❌ Game already started.',
-              ephemeral: true,
+      game.players.push(interaction.user.id);
+
+      const message =
+        await interaction.reply({
+          embeds: [buildGameEmbed(game)],
+          components: [lobbyButtons()],
+          fetchReply: true,
+        });
+
+      game.message = message;
+
+      // ======================================================
+      // COLLECTOR
+      // ======================================================
+
+      const collector =
+        message.createMessageComponentCollector({
+          time: 30 * 60 * 1000,
+        });
+
+      game.collector = collector;
+
+      collector.on('collect', async (component) => {
+        try {
+          // ==================================================
+          // JOIN
+          // ==================================================
+
+          if (component.customId === 'uno_join') {
+            if (game.started) {
+              return component.reply({
+                content:
+                  '❌ The game has already started.',
+                ephemeral: true,
+              });
+            }
+
+            if (
+              game.players.includes(component.user.id)
+            ) {
+              return component.reply({
+                content:
+                  '❌ You already joined this game.',
+                ephemeral: true,
+              });
+            }
+
+            if (
+              game.players.length >= MAX_PLAYERS
+            ) {
+              return component.reply({
+                content:
+                  '❌ This game is full. Maximum 10 players.',
+                ephemeral: true,
+              });
+            }
+
+            game.players.push(component.user.id);
+
+            await component.update({
+              embeds: [buildGameEmbed(game)],
+              components: [lobbyButtons()],
             });
+
+            return;
           }
 
-          if (game.players.includes(component.user.id)) {
-            return component.reply({
-              content: '❌ You already joined.',
-              ephemeral: true,
-            });
+          // ==================================================
+          // START
+          // ==================================================
+
+          if (component.customId === 'uno_start') {
+            if (
+              component.user.id !== game.hostId
+            ) {
+              return component.reply({
+                content:
+                  '❌ Only the game creator can start the game.',
+                ephemeral: true,
+              });
+            }
+
+            try {
+              await startGame(game);
+
+              await component.update({
+                embeds: [buildGameEmbed(game)],
+                components: gameButtons(),
+              });
+
+              if (currentPlayer(game) === 'BOT') {
+                setTimeout(
+                  () => botTurn(game),
+                  1200
+                );
+              }
+            } catch (error) {
+              console.error(
+                'UNO start error:',
+                error
+              );
+
+              await component.reply({
+                content:
+                  '❌ Could not start the game.',
+                ephemeral: true,
+              });
+            }
+
+            return;
           }
 
-          if (game.players.length >= MAX_PLAYERS) {
-            return component.reply({
-              content: '❌ Game is full.',
-              ephemeral: true,
-            });
-          }
+          // ==================================================
+          // CANCEL
+          // ==================================================
 
-          game.players.push(component.user.id);
+          if (component.customId === 'uno_cancel') {
+            if (
+              component.user.id !== game.hostId
+            ) {
+              return component.reply({
+                content:
+                  '❌ Only the game creator can cancel the game.',
+                ephemeral: true,
+              });
+            }
 
-          return component.update({
-            embeds: [buildGameEmbed(game)],
-            components: [lobbyButtons()],
-          });
-        }
+            await endGame(
+              game,
+              '❌ UNO game cancelled.'
+            );
 
-        if (component.customId === 'uno_start') {
-          if (component.user.id !== game.hostId) {
             return component.reply({
               content:
-                '❌ Only the host can start the game.',
+                '❌ UNO game cancelled.',
               ephemeral: true,
             });
           }
 
-          try {
-            await startGame(game);
+          // ==================================================
+          // GAME CHECK
+          // ==================================================
+
+          if (!game.started) {
+            return component.reply({
+              content:
+                '❌ The game has not started yet.',
+              ephemeral: true,
+            });
+          }
+
+          // ==================================================
+          // MY CARDS
+          // ==================================================
+
+          if (component.customId === 'uno_cards') {
+            if (
+              !game.players.includes(
+                component.user.id
+              )
+            ) {
+              return component.reply({
+                content:
+                  '❌ You are not in this game.',
+                ephemeral: true,
+              });
+            }
+
+            const hand =
+              game.hands.get(
+                component.user.id
+              ) || [];
+
+            const cardList =
+              hand.length > 0
+                ? hand
+                    .map(
+                      (card, index) =>
+                        `**${index + 1}.** ${cardText(card)}`
+                    )
+                    .join('\n')
+                : 'No cards.';
+
+            const menu =
+              cardSelectMenu(
+                game,
+                component.user.id
+              );
+
+            await component.reply({
+              content:
+                `### 🃏 Your Cards\n${cardList}\n\n${
+                  menu
+                    ? 'Select a playable card below.'
+                    : '❌ You currently have no playable cards.'
+                }`,
+              components: menu ? [menu] : [],
+              ephemeral: true,
+            });
+
+            return;
+          }
+
+          // ==================================================
+          // PLAY CARD
+          // ==================================================
+
+          if (component.customId === 'uno_play') {
+            const index =
+              Number(component.values[0]);
+
+            await playCard(
+              game,
+              component.user.id,
+              index,
+              component
+            );
+
+            return;
+          }
+
+          // ==================================================
+          // COLOR
+          // ==================================================
+
+          if (component.customId === 'uno_color') {
+            const color =
+              component.values[0];
+
+            await playWildAfterColor(
+              game,
+              component.user.id,
+              color,
+              component
+            );
+
+            return;
+          }
+
+          // ==================================================
+          // DRAW
+          // ==================================================
+
+          if (component.customId === 'uno_draw') {
+            if (
+              currentPlayer(game) !==
+              component.user.id
+            ) {
+              return component.reply({
+                content:
+                  '❌ It is not your turn.',
+                ephemeral: true,
+              });
+            }
+
+            const drawn =
+              drawCards(game, 1);
+
+            if (drawn.length > 0) {
+              game.hands
+                .get(component.user.id)
+                .push(drawn[0]);
+            }
+
+            nextTurn(game);
 
             await component.update({
               embeds: [buildGameEmbed(game)],
@@ -858,184 +1277,81 @@ export default {
             });
 
             if (currentPlayer(game) === 'BOT') {
-              setTimeout(() => botTurn(game), 1200);
+              setTimeout(
+                () => botTurn(game),
+                1200
+              );
             }
-          } catch {
+
+            return;
+          }
+
+          // ==================================================
+          // UNO
+          // ==================================================
+
+          if (component.customId === 'uno_call') {
+            const hand =
+              game.hands.get(
+                component.user.id
+              );
+
+            if (!hand) {
+              return component.reply({
+                content:
+                  '❌ You are not in this game.',
+                ephemeral: true,
+              });
+            }
+
+            if (hand.length !== 1) {
+              return component.reply({
+                content:
+                  '❌ You can only call UNO when you have exactly 1 card.',
+                ephemeral: true,
+              });
+            }
+
             await component.reply({
               content:
-                '❌ Need at least 2 players.',
-              ephemeral: true,
+                `📢 **UNO!** <@${component.user.id}> has 1 card left!`,
             });
+
+            return;
           }
-
-          return;
-        }
-
-        if (component.customId === 'uno_cancel') {
-          if (component.user.id !== game.hostId) {
-            return component.reply({
-              content:
-                '❌ Only the host can cancel the game.',
-              ephemeral: true,
-            });
-          }
-
-          await endGame(
-            game,
-            '❌ UNO game cancelled.'
+        } catch (error) {
+          console.error(
+            'UNO interaction error:',
+            error
           );
 
-          return component.reply({
-            content: '❌ UNO game cancelled.',
-            ephemeral: true,
-          });
-        }
-
-        if (!game.started) {
-          return component.reply({
-            content: '❌ Game has not started.',
-            ephemeral: true,
-          });
-        }
-
-        if (component.customId === 'uno_cards') {
-          if (!game.players.includes(component.user.id)) {
-            return component.reply({
-              content: '❌ You are not in this game.',
-              ephemeral: true,
-            });
-          }
-
-          const hand =
-            game.hands.get(component.user.id) || [];
-
-          const cardList =
-            hand.length > 0
-              ? hand
-                  .map(
-                    (card, index) =>
-                      `**${index + 1}.** ${cardText(card)}`
-                  )
-                  .join('\n')
-              : 'No cards.';
-
-          const menu = cardSelectMenu(
-            game,
-            component.user.id
-          );
-
-          return component.reply({
-            content:
-              `### 🃏 Your Cards\n${cardList}\n\n${
-                menu
-                  ? 'Select a playable card below.'
-                  : '❌ No playable cards.'
-              }`,
-            components: menu ? [menu] : [],
-            ephemeral: true,
-          });
-        }
-
-        if (component.customId === 'uno_play') {
-          return playCard(
-            game,
-            component.user.id,
-            Number(component.values[0]),
-            component
-          );
-        }
-
-        if (component.customId === 'uno_color') {
-          return playWild(
-            game,
-            component.user.id,
-            component.values[0],
-            component
-          );
-        }
-
-        if (component.customId === 'uno_draw') {
           if (
-            currentPlayer(game) !==
-            component.user.id
+            !component.replied &&
+            !component.deferred
           ) {
-            return component.reply({
-              content: '❌ It is not your turn.',
-              ephemeral: true,
-            });
-          }
-
-          const drawn = drawCards(game, 1);
-
-          if (drawn.length) {
-            game.hands
-              .get(component.user.id)
-              ?.push(drawn[0]);
-          }
-
-          nextTurn(game);
-
-          await component.update({
-            embeds: [buildGameEmbed(game)],
-            components: gameButtons(),
-          });
-
-          if (currentPlayer(game) === 'BOT') {
-            setTimeout(() => botTurn(game), 1200);
-          }
-
-          return;
-        }
-
-        if (component.customId === 'uno_call') {
-          const hand =
-            game.hands.get(component.user.id);
-
-          if (!hand) {
-            return component.reply({
+            await component.reply({
               content:
-                '❌ You are not in this game.',
+                '❌ Something went wrong while processing that action.',
               ephemeral: true,
             });
           }
-
-          if (hand.length !== 1) {
-            return component.reply({
-              content:
-                '❌ You need exactly 1 card to call UNO.',
-              ephemeral: true,
-            });
-          }
-
-          return component.reply({
-            content:
-              `📢 **UNO!** <@${component.user.id}> has 1 card left!`,
-          });
         }
-      } catch (error) {
-        console.error('UNO interaction error:', error);
+      });
 
-        if (
-          !component.replied &&
-          !component.deferred
-        ) {
-          await component.reply({
-            content:
-              '❌ Something went wrong.',
-            ephemeral: true,
-          });
+      collector.on('end', async () => {
+        if (games.has(game.channelId)) {
+          games.delete(game.channelId);
         }
-      }
-    });
 
-    collector.on('end', async () => {
-      games.delete(game.channelId);
+        try {
+          await message.edit({
+            components: [],
+          });
+        } catch {}
+      });
 
-      try {
-        await message.edit({
-          components: [],
-        });
-      } catch {}
-    });
+      return;
+    }
   },
 };
+```
