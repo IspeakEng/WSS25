@@ -22,10 +22,7 @@ import {
   resolveSubcommandAlias,
 } from '../config/commands/commandAliases.js';
 
-import {
-  getPrefixRestriction,
-} from '../config/commands/prefixRestrictions.js';
-
+import { getPrefixRestriction } from '../config/commands/prefixRestrictions.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 
 import {
@@ -76,17 +73,6 @@ export default {
 
       /*
       |--------------------------------------------------------------------------
-      | ADMIN BYPASS
-      |--------------------------------------------------------------------------
-      */
-
-      if (message.member?.permissions.has('Administrator')) {
-        return;
-      }
-
-
-      /*
-      |--------------------------------------------------------------------------
       | BAD WORD FILTER
       |--------------------------------------------------------------------------
       */
@@ -110,7 +96,7 @@ export default {
       const content = message.content.toLowerCase();
 
       const containsBadWord = badWords.some(word =>
-        content.includes(word.toLowerCase())
+        content.includes(word)
       );
 
 
@@ -140,10 +126,11 @@ export default {
 
       /*
       |--------------------------------------------------------------------------
-      | WSS'25 AI CHATBOT
+      | WSS'25 CHATBOT
       |--------------------------------------------------------------------------
       |
-      | The bot only replies when it is mentioned.
+      | Anyone can talk to the bot by mentioning it.
+      | Owner/admin/member — everyone can use it.
       |
       | Example:
       | @WSS'25 yo wassup?
@@ -151,19 +138,38 @@ export default {
       |--------------------------------------------------------------------------
       */
 
-      if (message.mentions.has(client.user)) {
+      const botMentioned =
+        message.mentions.users.has(client.user.id);
+
+
+      if (botMentioned) {
 
         try {
+
+          logger.info(
+            `${message.author.tag} mentioned WSS'25 in #${message.channel.name}`
+          );
+
 
           const reply = await getAIReply(
             message,
             []
           );
 
+
           if (reply) {
 
             await message.reply({
               content: reply,
+              allowedMentions: {
+                repliedUser: false,
+              },
+            });
+
+          } else {
+
+            await message.reply({
+              content: 'hmm 😭 amar brain ektu lag korlo.',
               allowedMentions: {
                 repliedUser: false,
               },
@@ -186,7 +192,7 @@ export default {
 
       /*
       |--------------------------------------------------------------------------
-      | LOG MESSAGE
+      | MESSAGE LOG
       |--------------------------------------------------------------------------
       */
 
@@ -250,14 +256,11 @@ export default {
 
 /*
 |--------------------------------------------------------------------------
-| PREFIX COMMAND HANDLER
+| PREFIX COMMAND
 |--------------------------------------------------------------------------
 */
 
-async function handlePrefixCommand(
-  message,
-  client
-) {
+async function handlePrefixCommand(message, client) {
 
   try {
 
@@ -267,9 +270,11 @@ async function handlePrefixCommand(
         message.guild.id
       );
 
+
     const prefix =
       guildConfig?.prefix ||
       getCommandPrefix();
+
 
     const parsed =
       parsePrefixCommand(
@@ -291,12 +296,13 @@ async function handlePrefixCommand(
 
     /*
     |--------------------------------------------------------------------------
-    | MUSIC PREFIX SHORTCUTS
+    | MUSIC SHORTCUTS
     |--------------------------------------------------------------------------
     */
 
     const musicPrefixShortcut =
       commandName.toLowerCase();
+
 
     const MUSIC_PREFIX_SHORTCUTS =
       new Set([
@@ -332,7 +338,7 @@ async function handlePrefixCommand(
 
     /*
     |--------------------------------------------------------------------------
-    | COMMAND ALIAS
+    | RESOLVE COMMAND
     |--------------------------------------------------------------------------
     */
 
@@ -340,11 +346,6 @@ async function handlePrefixCommand(
       resolveCommandAlias(
         commandName
       );
-
-
-    logger.info(
-      `Resolved command name: ${resolvedCommandName}`
-    );
 
 
     const command =
@@ -365,15 +366,13 @@ async function handlePrefixCommand(
 
     /*
     |--------------------------------------------------------------------------
-    | MAINTENANCE MODE
+    | MAINTENANCE
     |--------------------------------------------------------------------------
     */
 
     if (
       isMaintenanceMode() &&
-      !isBotOwner(
-        message.author.id
-      )
+      !isBotOwner(message.author.id)
     ) {
 
       await message.channel.send({
@@ -395,7 +394,7 @@ async function handlePrefixCommand(
 
     /*
     |--------------------------------------------------------------------------
-    | COMMAND CATEGORY
+    | CATEGORY
     |--------------------------------------------------------------------------
     */
 
@@ -437,9 +436,7 @@ async function handlePrefixCommand(
 
 
     if (
-      !supportsPrefixExecution(
-        command
-      ) ||
+      !supportsPrefixExecution(command) ||
       restriction.blocked
     ) {
 
@@ -450,12 +447,9 @@ async function handlePrefixCommand(
 
         const embed =
           createEmbed({
-            title:
-              'Slash Command Only',
-
+            title: 'Slash Command Only',
             description:
               `${restriction.reason}\nUse \`/${resolvedCommandName}\` instead.`,
-
             color: 'info',
           });
 
@@ -472,30 +466,33 @@ async function handlePrefixCommand(
 
     /*
     |--------------------------------------------------------------------------
-    | COMMAND ENABLED CHECK
+    | COMMAND ENABLED
     |--------------------------------------------------------------------------
     */
 
-    if (
-      !(await isCommandEnabled(
+    const accessKey =
+      resolvePrefixAccessKey(
+        command.data,
+        args
+      );
+
+
+    const commandEnabled =
+      await isCommandEnabled(
         client,
         message.guild.id,
-        resolvePrefixAccessKey(
-          command.data,
-          args
-        ),
+        accessKey,
         command.category
-      ))
-    ) {
+      );
+
+
+    if (!commandEnabled) {
 
       const embed =
         createEmbed({
-          title:
-            'Command Disabled',
-
+          title: 'Command Disabled',
           description:
             'This command has been disabled for this server.',
-
           color: 'error',
         });
 
@@ -515,11 +512,8 @@ async function handlePrefixCommand(
     */
 
     const mockInteractionForProtection = {
-      guildId:
-        message.guild.id,
-
-      user:
-        message.author,
+      guildId: message.guild.id,
+      user: message.author,
     };
 
 
@@ -531,9 +525,7 @@ async function handlePrefixCommand(
       );
 
 
-    if (
-      !abuseProtection.allowed
-    ) {
+    if (!abuseProtection.allowed) {
 
       const formattedCooldown =
         formatCooldownDuration(
@@ -543,12 +535,9 @@ async function handlePrefixCommand(
 
       const embed =
         createEmbed({
-          title:
-            'Command Cooldown',
-
+          title: 'Command Cooldown',
           description:
             `This command is on cooldown. Please wait ${formattedCooldown} before trying again.`,
-
           color: 'error',
         });
 
@@ -563,7 +552,7 @@ async function handlePrefixCommand(
 
     /*
     |--------------------------------------------------------------------------
-    | EXECUTE COMMAND
+    | EXECUTE
     |--------------------------------------------------------------------------
     */
 
@@ -599,10 +588,7 @@ async function handlePrefixCommand(
 |--------------------------------------------------------------------------
 */
 
-async function handleCountingGame(
-  message,
-  client
-) {
+async function handleCountingGame(message, client) {
 
   try {
 
@@ -616,10 +602,8 @@ async function handleCountingGame(
     if (
       !config.enabled ||
       !config.channelId ||
-      message.channel.id !==
-        config.channelId
+      message.channel.id !== config.channelId
     ) {
-
       return false;
     }
 
@@ -637,20 +621,12 @@ async function handleCountingGame(
 
     const invalidAttempt =
       !validCount ||
-      message.author.id ===
-        config.lastUserId;
+      message.author.id === config.lastUserId;
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | INVALID COUNT
-    |--------------------------------------------------------------------------
-    */
 
     if (invalidAttempt) {
 
-      await message.delete()
-        .catch(() => {});
+      await message.delete().catch(() => {});
 
 
       await saveCountingGameConfig(
@@ -672,23 +648,13 @@ async function handleCountingGame(
 
 
       setTimeout(() => {
-
-        failureMessage
-          .delete()
-          .catch(() => {});
-
+        failureMessage.delete().catch(() => {});
       }, 10000);
 
 
       return true;
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | CORRECT COUNT
-    |--------------------------------------------------------------------------
-    */
 
     await recordCorrectCount(
       client,
@@ -714,14 +680,11 @@ async function handleCountingGame(
 
 /*
 |--------------------------------------------------------------------------
-| LEVELING SYSTEM
+| LEVELING
 |--------------------------------------------------------------------------
 */
 
-async function handleLeveling(
-  message,
-  client
-) {
+async function handleLeveling(message, client) {
 
   try {
 
@@ -749,12 +712,6 @@ async function handleLeveling(
       );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | LEVELING ENABLED
-    |--------------------------------------------------------------------------
-    */
-
     if (!levelingConfig?.enabled) {
       return;
     }
@@ -762,17 +719,15 @@ async function handleLeveling(
 
     /*
     |--------------------------------------------------------------------------
-    | IGNORED CHANNEL
+    | IGNORED CHANNELS
     |--------------------------------------------------------------------------
     */
 
     if (
-      levelingConfig.ignoredChannels
-        ?.includes(
-          message.channel.id
-        )
+      levelingConfig.ignoredChannels?.includes(
+        message.channel.id
+      )
     ) {
-
       return;
     }
 
@@ -797,12 +752,11 @@ async function handleLeveling(
         member &&
         member.roles.cache.some(
           role =>
-            levelingConfig
-              .ignoredRoles
-              .includes(role.id)
+            levelingConfig.ignoredRoles.includes(
+              role.id
+            )
         )
       ) {
-
         return;
       }
     }
@@ -815,12 +769,10 @@ async function handleLeveling(
     */
 
     if (
-      levelingConfig.blacklistedUsers
-        ?.includes(
-          message.author.id
-        )
+      levelingConfig.blacklistedUsers?.includes(
+        message.author.id
+      )
     ) {
-
       return;
     }
 
@@ -835,14 +787,13 @@ async function handleLeveling(
       !message.content ||
       message.content.trim().length === 0
     ) {
-
       return;
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | USER LEVEL DATA
+    | USER DATA
     |--------------------------------------------------------------------------
     */
 
@@ -861,8 +812,7 @@ async function handleLeveling(
     */
 
     const cooldownTime =
-      levelingConfig.xpCooldown ||
-      60;
+      levelingConfig.xpCooldown || 60;
 
 
     const now =
@@ -878,7 +828,6 @@ async function handleLeveling(
       timeSinceLastMessage <
       cooldownTime * 1000
     ) {
-
       return;
     }
 
@@ -912,22 +861,11 @@ async function handleLeveling(
       );
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | RANDOM XP
-    |--------------------------------------------------------------------------
-    */
-
     const xpToGive =
       Math.floor(
         Math.random() *
-          (
-            safeMaxXP -
-            safeMinXP +
-            1
-          )
-      ) +
-      safeMinXP;
+        (safeMaxXP - safeMinXP + 1)
+      ) + safeMinXP;
 
 
     /*
@@ -948,7 +886,7 @@ async function handleLeveling(
       finalXP =
         Math.floor(
           finalXP *
-            levelingConfig.xpMultiplier
+          levelingConfig.xpMultiplier
         );
 
     }
@@ -971,7 +909,7 @@ async function handleLeveling(
 
     /*
     |--------------------------------------------------------------------------
-    | LEVEL UP LOG
+    | LEVEL UP
     |--------------------------------------------------------------------------
     */
 
