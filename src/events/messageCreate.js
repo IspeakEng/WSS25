@@ -41,12 +41,12 @@ const badWords = [
     'bastard',
     'asshole',
     'dick',
-    'dumbass',
-    'bullshit',
-    'piss off',
-    'son of a bitch',
-    'piece of shit',
-    'fuck off',
+    'slut',
+    'pussy',
+    'porn',
+    'bitch',
+    'sex',
+    'cum',
 ];
 
 const content = message.content.toLowerCase();
