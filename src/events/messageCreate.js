@@ -28,7 +28,53 @@ export default {
     try {
       if (message.author.bot || !message.guild) return;
 
-      logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
+if (message.member?.permissions.has('Administrator')) {
+    return;
+}
+
+const badWords = [
+    'fuck',
+    'fucking',
+    'motherfucker',
+    'shit',
+    'bitch',
+    'bastard',
+    'asshole',
+    'dick',
+    'dumbass',
+    'bullshit',
+    'piss off',
+    'son of a bitch',
+    'piece of shit',
+    'fuck off',
+];
+
+const content = message.content.toLowerCase();
+
+const containsBadWord = badWords.some(word =>
+    content.includes(word.toLowerCase())
+);
+
+if (containsBadWord) {
+    try {
+        await message.delete();
+
+        const warning = await message.channel.send({
+            content: `⚠️ ${message.author}, please keep the chat clean.`
+        });
+
+        setTimeout(() => {
+            warning.delete().catch(() => {});
+        }, 5000);
+
+    } catch (error) {
+        logger.error('Failed to handle bad word message:', error);
+    }
+
+    return;
+}
+
+logger.debug(`Message received from ${message.author.tag}: ${message.content}`);
 
       const countingProcessed = await handleCountingGame(message, client);
       if (countingProcessed) {
