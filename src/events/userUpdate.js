@@ -10,11 +10,8 @@ export default {
     try {
       if (oldUser.bot) return;
 
-      const usernameChanged =
-        oldUser.username !== newUser.username;
-
-      const discriminatorChanged =
-        oldUser.discriminator !== newUser.discriminator;
+      const usernameChanged = oldUser.username !== newUser.username;
+      const discriminatorChanged = oldUser.discriminator !== newUser.discriminator;
 
       if (!usernameChanged && !discriminatorChanged) return;
 
@@ -23,13 +20,13 @@ export default {
       if (usernameChanged) {
         fields.push({
           name: '🏷️ Old Username',
-          value: oldUser.username,
+          value: oldUser.username || 'None',
           inline: true
         });
 
         fields.push({
           name: '🏷️ New Username',
-          value: newUser.username,
+          value: newUser.username || 'None',
           inline: true
         });
       }
@@ -48,9 +45,7 @@ export default {
         });
       }
 
-      const guilds = [
-        ...newUser.client.guilds.cache.values()
-      ];
+      const guilds = [...newUser.client.guilds.cache.values()];
 
       for (const guild of guilds) {
         if (!guild.members.cache.has(newUser.id)) continue;
@@ -66,7 +61,7 @@ export default {
               {
                 name: '👤 User',
                 value: `${newUser.tag} (${newUser.id})`,
-                inline: true
+                inline: false
               },
               ...fields
             ]
@@ -78,10 +73,7 @@ export default {
         `Processed userUpdate for ${newUser.id} across ${guilds.length} guild(s)`
       );
     } catch (error) {
-      logger.error(
-        'Error in userUpdate event:',
-        error
-      );
+      logger.error('Error in userUpdate event:', error);
     }
   }
 };
