@@ -1,3 +1,4 @@
+```js
 import { Events } from 'discord.js';
 import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import { logger } from '../utils/logger.js';
@@ -10,55 +11,76 @@ export default {
     try {
       if (oldUser.bot) return;
 
-      const usernameChanged = oldUser.username !== newUser.username;
-      const discriminatorChanged = oldUser.discriminator !== newUser.discriminator;
-
-      if (!usernameChanged && !discriminatorChanged) return;
-
+      const user = await newUser.fetch(true);
       const fields = [];
 
-      if (usernameChanged) {
+      // Username
+      if (oldUser.username !== user.username) {
         fields.push({
-          name: '🏷️ Old Username',
-          value: oldUser.username,
-          inline: true
+          name: '🏷️ Username',
+          value: `${oldUser.username} → ${user.username}`,
+          inline: false
         });
+      }
+
+      // Display Name
+      if (oldUser.globalName !== user.globalName) {
         fields.push({
-          name: '🏷️ New Username',
-          value: newUser.username,
+          name: '✨ Display Name',
+          value: `${oldUser.globalName || 'None'} → ${user.globalName || 'None'}`,
+          inline: false
+        });
+      }
+
+      // Avatar
+      if (oldUser.avatar !== user.avatar) {
+        fields.push({
+          name: '🖼️ Avatar',
+          value: `[View Avatar](${user.displayAvatarURL({ size: 1024 })})`,
+          inline: false
+        });
+      }
+
+      // Banner
+      if (oldUser.banner !== user.banner) {
+        fields.push({
+          name: '🎨 Banner',
+          value: user.bannerURL({ size: 1024 })
+            ? `[View Banner](${user.bannerURL({ size: 1024 })})`
+            : 'Removed',
+          inline: false
+        });
+      }
+
+      // Accent Color
+      if (oldUser.accentColor !== user.accentColor) {
+        fields.push({
+          name: '🎨 Accent Color',
+          value: user.hexAccentColor || 'None',
           inline: true
         });
       }
 
-      if (discriminatorChanged) {
-        fields.push({
-          name: '🔢 Old Tag',
-          value: `#${oldUser.discriminator}`,
-          inline: true
-        });
-        fields.push({
-          name: '🔢 New Tag',
-          value: `#${newUser.discriminator}`,
-          inline: true
-        });
-      }
+      // Nothing changed
+      if (!fields.length) return;
 
-      const guilds = [...newUser.client.guilds.cache.values()];
+      const guilds = [...user.client.guilds.cache.values()];
+
       for (const guild of guilds) {
-        if (!guild.members.cache.has(newUser.id)) continue;
+        if (!guild.members.cache.has(user.id)) continue;
 
         await logEvent({
-          client: newUser.client,
+          client: user.client,
           guildId: guild.id,
-          eventType: EVENT_TYPES.MEMBER_NAME_CHANGE,
+          eventType: EVENT_TYPES.MEMBER_PROFILE_CHANGE,
           data: {
-            description: `${newUser.tag} updated their username`,
-            userId: newUser.id,
+            description: `${user.tag} updated their profile`,
+            userId: user.id,
             fields: [
               {
                 name: '👤 User',
-                value: `${newUser.tag} (${newUser.id})`,
-                inline: true
+                value: `${user.tag} (${user.id})`,
+                inline: false
               },
               ...fields
             ]
@@ -66,9 +88,10 @@ export default {
         });
       }
 
-      logger.debug(`Processed userUpdate for ${newUser.id} across ${guilds.length} guild(s)`);
+      logger.debug(`Profile update processed for ${user.id}`);
     } catch (error) {
       logger.error('Error in userUpdate event:', error);
     }
   }
 };
+```
