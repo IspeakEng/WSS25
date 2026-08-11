@@ -23,6 +23,7 @@ export default {
 
         const message = interaction.options.getString('message');
 
+        await interaction.channel.sendTyping();
         await interaction.channel.send(message);
 
         await interaction.reply({
