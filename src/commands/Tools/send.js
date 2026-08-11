@@ -23,7 +23,13 @@ export default {
 
         const message = interaction.options.getString('message');
 
+        // Show typing indicator
         await interaction.channel.sendTyping();
+
+        // Wait 1.5 seconds
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Send the message
         await interaction.channel.send(message);
 
         await interaction.reply({
