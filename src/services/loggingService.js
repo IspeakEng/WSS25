@@ -1,4 +1,3 @@
-```js
 // loggingService.js
 
 import { ChannelType } from 'discord.js';
