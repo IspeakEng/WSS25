@@ -1,9 +1,3 @@
-/*
- * ==========================================================================
- * SAVE USER LEVEL DATA
- * ==========================================================================
- */
-
 export async function saveUserLevelData(
     client,
     guildId,
@@ -36,13 +30,16 @@ export async function saveUserLevelData(
 
         let lastMessage = null;
 
-        if (data.lastMessage) {
+        if (data.lastMessage instanceof Date) {
+            lastMessage = data.lastMessage;
+        } else if (
+            data.lastMessage !== null &&
+            data.lastMessage !== undefined
+        ) {
             const timestamp = Number(data.lastMessage);
 
             if (Number.isFinite(timestamp)) {
                 lastMessage = new Date(timestamp);
-            } else if (data.lastMessage instanceof Date) {
-                lastMessage = data.lastMessage;
             }
         }
 
