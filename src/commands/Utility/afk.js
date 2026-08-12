@@ -83,7 +83,7 @@ export default {
                     key,
                     {
                         reason: reason,
-                        timestamp: Date.now(),
+                       timestamp: new Date().toISOString(),
                     }
                 );
 
