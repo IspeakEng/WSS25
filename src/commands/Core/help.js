@@ -131,8 +131,8 @@ export async function createInitialHelpMenu(client) {
     embed.setTimestamp();
 
     const supportButton = new ButtonBuilder()
-        .setLabel("Support Server")
-        .setURL("https://discord.gg/QnWNz2dKCE")
+        .setLabel("WSS'25")
+        .setURL("https://discord.gg/NaTuESNXSz")
         .setStyle(ButtonStyle.Link);
 
     const selectRow = createSelectMenu(
