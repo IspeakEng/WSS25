@@ -48,16 +48,17 @@ import {
     recordCorrectCount,
 } from '../services/countingGameService.js';
 
+
 /*
  * ==========================================================================
  * AUTO MENTION REACTION CONFIG
  * ==========================================================================
  */
 
-// User ID that will trigger the reaction when mentioned
+// Your Discord User ID
 const TARGET_USER_ID = '1054967242497982476';
 
-// Custom emoji ID used for the reaction
+// Custom emoji ID
 const REACTION_EMOJI_ID = '1528019310742867988';
 
 
@@ -73,7 +74,10 @@ export default {
     async execute(message, client) {
         try {
 
-            // Ignore bots and DMs
+            /*
+             * Ignore bots and DMs
+             */
+
             if (
                 message.author.bot ||
                 !message.guild
@@ -127,9 +131,11 @@ export default {
                     if (welcomeBack) {
 
                         setTimeout(() => {
+
                             welcomeBack
                                 .delete()
                                 .catch(() => {});
+
                         }, 5000);
                     }
                 }
@@ -200,6 +206,7 @@ export default {
                         if (
                             Number.isFinite(timestampMs)
                         ) {
+
                             timestampText =
                                 `<t:${Math.floor(
                                     timestampMs / 1000
@@ -229,18 +236,33 @@ export default {
              * AUTO MENTION REACTION
              * ==========================================================================
              *
-             * When someone mentions TARGET_USER_ID,
-             * the bot reacts using the custom emoji.
+             * Whenever someone mentions the target user,
+             * the bot automatically reacts to that message.
              *
              * ==========================================================================
              */
 
             try {
 
+                /*
+                 * Discord's official mention collection
+                 */
+
                 const targetMentioned =
-                    message.mentions.users.has(
-                        TARGET_USER_ID
+                    message.mentions.users.some(
+                        user =>
+                            user.id === TARGET_USER_ID
                     );
+
+
+                /*
+                 * Extra fallback check.
+                 *
+                 * Discord mentions can appear as:
+                 *
+                 * <@USER_ID>
+                 * <@!USER_ID>
+                 */
 
                 const rawMentionDetected =
                     message.content.includes(
@@ -250,34 +272,54 @@ export default {
                         `<@!${TARGET_USER_ID}>`
                     );
 
+
+                /*
+                 * If the target user was mentioned,
+                 * add the custom emoji reaction.
+                 */
+
                 if (
                     targetMentioned ||
                     rawMentionDetected
                 ) {
 
                     logger.info(
-                        `🎯 Target user ${TARGET_USER_ID} was mentioned by ${message.author.tag}`
+                        `🎯 ${message.author.tag} mentioned target user ${TARGET_USER_ID}`
                     );
 
+
                     /*
-                     * Fetch the custom emoji from Discord.
+                     * Fetch emoji from Discord.
                      */
 
                     const reactionEmoji =
                         await client.emojis.fetch(
                             REACTION_EMOJI_ID
-                        ).catch(() => null);
+                        ).catch(error => {
+
+                            logger.error(
+                                `❌ Failed to fetch reaction emoji ${REACTION_EMOJI_ID}:`,
+                                error
+                            );
+
+                            return null;
+                        });
+
+
+                    /*
+                     * Emoji unavailable
+                     */
 
                     if (!reactionEmoji) {
 
                         logger.error(
-                            `❌ Could not find/access emoji: ${REACTION_EMOJI_ID}`
+                            `❌ Reaction emoji ${REACTION_EMOJI_ID} was not found or cannot be accessed by the bot.`
                         );
 
                     } else {
 
                         /*
-                         * Add reaction.
+                         * React to the message.
                          */
 
                         await message.react(
@@ -285,7 +327,7 @@ export default {
                         );
 
                         logger.info(
-                            `✅ Auto reaction added to message ${message.id}`
+                            `✅ Auto mention reaction added to message ${message.id}`
                         );
                     }
                 }
@@ -407,7 +449,13 @@ export default {
              * LEVELING
              * ==========================================================================
              *
-             * Leveling is currently disabled.
+             * Leveling is completely disabled.
+             *
+             * There are NO imports or calls to:
+             *
+             * - leveling.js
+             * - xpSystem.js
+             * - levelRoleSyncService.js
              *
              * ==========================================================================
              */
