@@ -95,9 +95,99 @@ class TitanBot extends Client {
       startupLog('Starting web server...');
       this.startWebServer();
 
+      /*
+       * ========================================================================
+       * LOAD COMMANDS
+       * ========================================================================
+       */
+
       startupLog('Loading commands...');
+
       await loadCommands(this);
-      startupLog(`Commands loaded: ${this.commands.size}`);
+
+      /*
+       * ========================================================================
+       * REMOVE DISABLED COMMANDS
+       * ========================================================================
+       *
+       * Removed:
+       * - /app-admin and all of its subcommands
+       * - All commands belonging to the Economy category
+       *
+       * Kept:
+       * - /autoverify
+       * - Verification commands
+       * - Community commands
+       * - All other categories
+       */
+
+      let removedCommandCount = 0;
+
+      for (const [commandName, command] of this.commands) {
+
+        const commandData =
+          command?.data?.toJSON
+            ? command.data.toJSON()
+            : command?.data;
+
+        const registeredName =
+          commandData?.name ||
+          commandName;
+
+        const category =
+          command?.category ||
+          '';
+
+        /*
+         * Remove /app-admin completely.
+         *
+         * This catches:
+         * /app-admin dashboard
+         * /app-admin list
+         * /app-admin review
+         * /app-admin setup
+         * and any future /app-admin subcommands.
+         */
+
+        const isAppAdminCommand =
+          registeredName === 'app-admin' ||
+          commandName === 'app-admin';
+
+        /*
+         * Remove Economy category.
+         */
+
+        const isEconomyCommand =
+          String(category).toLowerCase() === 'economy';
+
+        if (
+          isAppAdminCommand ||
+          isEconomyCommand
+        ) {
+
+          this.commands.delete(commandName);
+
+          removedCommandCount++;
+
+          startupLog(
+            `🚫 Disabled command: /${registeredName} [${category || 'Unknown category'}]`
+          );
+        }
+      }
+
+      startupLog(
+        `Commands loaded: ${this.commands.size}`
+      );
+
+      startupLog(
+        `Disabled commands removed: ${removedCommandCount}`
+      );
+
+      /*
+       * ========================================================================
+       * LOAD HANDLERS
+       * ========================================================================
+       */
 
       startupLog('Loading handlers...');
       await this.loadHandlers();
@@ -127,6 +217,7 @@ class TitanBot extends Client {
       );
 
       this.setupCronJobs();
+
     } catch (error) {
       logger.error('Failed to start bot:', error);
       process.exit(1);
@@ -626,6 +717,7 @@ class TitanBot extends Client {
       );
 
       process.exit(0);
+
     } catch (error) {
       logger.error(
         'Error during graceful shutdown:',
@@ -641,6 +733,7 @@ try {
   const bot = new TitanBot();
 
   const setupShutdown = () => {
+
     process.on(
       'SIGTERM',
       () => bot.shutdown('SIGTERM')
@@ -669,6 +762,7 @@ try {
     process.on(
       'unhandledRejection',
       reason => {
+
         const code = reason?.code;
 
         if (
@@ -709,6 +803,7 @@ try {
   setupShutdown();
 
   bot.start().catch(error => {
+
     logger.error(
       'Fatal error during bot startup:',
       error
@@ -718,7 +813,9 @@ try {
       'STARTUP_ERROR'
     );
   });
+
 } catch (error) {
+
   logger.error(
     'Fatal error during bot startup:',
     error
