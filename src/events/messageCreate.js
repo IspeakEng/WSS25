@@ -1,7 +1,6 @@
 import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 
-import { checkRateLimit } from '../utils/rateLimiter.js';
 import { parsePrefixCommand } from '../utils/prefixParser.js';
 
 import {
@@ -48,9 +47,6 @@ import {
     isValidCountingMessage,
     recordCorrectCount,
 } from '../services/countingGameService.js';
-
-const MESSAGE_XP_RATE_LIMIT_ATTEMPTS = 12;
-const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
 
 /*
  * ==========================================================================
@@ -168,12 +164,6 @@ export default {
                         afkData.reason ||
                         'No reason provided';
 
-                    /*
-                     * Support both:
-                     * - Date.now() timestamps
-                     * - ISO string timestamps
-                     */
-
                     let timestampText =
                         'Unknown';
 
@@ -221,6 +211,11 @@ export default {
              * ==========================================================================
              * AUTO MENTION REACTION
              * ==========================================================================
+             *
+             * Whenever someone mentions TARGET_USER_ID,
+             * the bot reacts with REACTION_EMOJI_ID.
+             *
+             * =======================================================================
              */
 
             try {
@@ -355,20 +350,6 @@ export default {
                 message,
                 client
             );
-
-            /*
-             * ----------------------------------------------------------------------
-             * LEVELING
-             * ----------------------------------------------------------------------
-             *
-             * Leveling has been completely disabled.
-             *
-             * No XP is awarded here.
-             * No leveling services are imported.
-             * No leveling database/config is accessed.
-             *
-             * ----------------------------------------------------------------------
-             */
 
         } catch (error) {
 
