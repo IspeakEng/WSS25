@@ -58,7 +58,7 @@ import {
 const TARGET_USER_ID = '1054967242497982476';
 
 // Custom emoji ID used for the reaction
-const REACTION_EMOJI_ID = '1528022603770630185';
+const REACTION_EMOJI_ID = '1528019310742867988';
 
 /*
  * ==========================================================================
