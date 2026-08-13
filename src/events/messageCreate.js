@@ -60,6 +60,19 @@ const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
 
 /*
  * ==========================================================================
+ * AUTO MENTION REACTION CONFIG
+ * ==========================================================================
+ */
+
+// User ID that will trigger the reaction when mentioned
+const TARGET_USER_ID = '1054967242497982476';
+
+// Custom emoji ID used for the reaction
+// CHANGE THIS ID if you want a different emoji
+const REACTION_EMOJI_ID = '1528022603770630185';
+
+/*
+ * ==========================================================================
  * MESSAGE CREATE
  * ==========================================================================
  */
@@ -212,24 +225,64 @@ export default {
             }
 
             /*
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              * AUTO MENTION REACTION
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              *
-             * React ONLY when Minhaz is directly mentioned.
-             * Do NOT react if the message is a reply.
+             * The bot reacts whenever TARGET_USER_ID is mentioned.
+             *
+             * This works even if the message is a reply.
              */
 
-            if (
-                message.mentions.users.has(
-                    '1054967242497982476'
-                ) &&
-                !message.reference
-            ) {
+            try {
 
-                await message
-                    .react('1528022603770630185')
-                    .catch(() => {});
+                // Check if target user was mentioned
+                if (
+                    message.mentions.users.has(
+                        TARGET_USER_ID
+                    )
+                ) {
+
+                    /*
+                     * Fetch the custom emoji from Discord.
+                     *
+                     * This helps make sure the emoji exists
+                     * and the bot can access it.
+                     */
+
+                    const reactionEmoji =
+                        await client.emojis.fetch(
+                            REACTION_EMOJI_ID
+                        ).catch(() => null);
+
+                    if (!reactionEmoji) {
+
+                        logger.warn(
+                            `Auto mention reaction emoji not found or inaccessible: ${REACTION_EMOJI_ID}`
+                        );
+
+                    } else {
+
+                        /*
+                         * Add reaction to the message
+                         */
+
+                        await message.react(
+                            reactionEmoji
+                        );
+
+                        logger.info(
+                            `Auto mention reaction added to message ${message.id}`
+                        );
+                    }
+                }
+
+            } catch (error) {
+
+                logger.error(
+                    'Failed to add auto mention reaction:',
+                    error
+                );
             }
 
             /*
@@ -857,7 +910,7 @@ async function handleLeveling(message, client) {
          * ------------------------------------------------------------------------
          * XP COOLDOWN
          * ------------------------------------------------------------------------
-         */
+ */
 
         const cooldownTime =
             levelingConfig.xpCooldown || 60;
