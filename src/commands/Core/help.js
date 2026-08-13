@@ -6,9 +6,7 @@ import {
 } from "discord.js";
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { createEmbed } from "../../utils/embeds.js";
-import {
-    createSelectMenu,
-} from "../../utils/components.js";
+import { createSelectMenu } from "../../utils/components.js";
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -18,13 +16,16 @@ const __dirname = path.dirname(__filename);
 
 const CATEGORY_SELECT_ID = "help-category-select";
 const ALL_COMMANDS_ID = "help-all-commands";
-const BUG_REPORT_BUTTON_ID = "help-bug-report";
 const HELP_MENU_TIMEOUT_MS = 5 * 60 * 1000;
+
+// Categories that should NEVER appear in /help
+const HIDDEN_CATEGORIES = new Set([
+    "Economy",
+]);
 
 const CATEGORY_ICONS = {
     Core: "ℹ️",
     Moderation: "🛡️",
-    Economy: "💰",
     Music: "🎵",
     Fun: "🎮",
     Leveling: "📊",
@@ -51,11 +52,17 @@ function formatCategoryName(rawCategory) {
 
 export async function createInitialHelpMenu(client) {
     const commandsPath = path.join(__dirname, "../../commands");
+
     const categoryDirs = (
         await fs.readdir(commandsPath, { withFileTypes: true })
     )
         .filter((dirent) => dirent.isDirectory())
         .map((dirent) => dirent.name)
+        .filter((category) => {
+            const categoryName = formatCategoryName(category);
+
+            return !HIDDEN_CATEGORIES.has(categoryName);
+        })
         .sort();
 
     const options = [
@@ -64,9 +71,11 @@ export async function createInitialHelpMenu(client) {
             description: "Browse every available command in a single list",
             value: ALL_COMMANDS_ID,
         },
+
         ...categoryDirs.map((category) => {
             const categoryName = formatCategoryName(category);
             const icon = CATEGORY_ICONS[categoryName] || "🔍";
+
             return {
                 label: `${icon} ${categoryName}`,
                 description: `View commands in the ${categoryName} category`,
@@ -76,46 +85,50 @@ export async function createInitialHelpMenu(client) {
     ];
 
     const botName = client?.user?.username || "Bot";
+
     const embed = createEmbed({
         title: `📖 ${botName} Help`,
-        description: 'Set up your server, pick what to enable, then browse commands below.',
-        color: 'primary',
-        thumbnail: client.user?.displayAvatarURL?.({ size: 1024 }),
+        description:
+            "Set up your server, pick what to enable, then browse commands below.",
+
+        color: "primary",
+
+        thumbnail: client.user?.displayAvatarURL?.({
+            size: 1024,
+        }),
+
         fields: [
             {
-                name: '🚀 Getting Started',
+                name: "🚀 Getting Started",
+
                 value: [
-                    '**1. Launch setup** — Run `/configwizard` to configure prefix, mod role, and logs.',
-                    '**2. Enable systems** — Use `/commands dashboard` to turn categories on or off.',                    '**3. Browse commands** — Use the menu below to view categories and commands.',
-                ].join('\n'),
+                    "**1. Launch setup** — Run `/configwizard` to configure prefix, mod role, and logs.",
+                    "**2. Enable systems** — Use `/commands dashboard` to turn categories on or off.",
+                    "**3. Browse commands** — Use the menu below to view categories and commands.",
+                ].join("\n"),
+
                 inline: false,
             },
+
             {
-                name: 'ℹ️ How It Works',
+                name: "ℹ️ How It Works",
+
                 value: [
-                    '• Dashboard commands manage each feature visually',
-                    '• Settings are saved per server',
-                    '• Slash commands and prefixes both work once enabled',
-                ].join('\n'),
-                inline: false,
-            },
-            {
-                name: '\u200B',
-                value: `-# ${botName} is [open source](https://youtu.be/1jCZX8s3bJE?si=NPOYx-vxVE1I5vJK)`,
+                    "• Dashboard commands manage each feature visually",
+                    "• Settings are saved per server",
+                    "• Slash commands and prefixes both work once enabled",
+                ].join("\n"),
+
                 inline: false,
             },
         ],
     });
 
-    embed.setFooter({ 
-        text: "Made with ❤️" 
+    embed.setFooter({
+        text: "Made with ❤️",
     });
-    embed.setTimestamp();
 
-    const bugReportButton = new ButtonBuilder()
-        .setCustomId(BUG_REPORT_BUTTON_ID)
-        .setLabel("Report Bug")
-        .setStyle(ButtonStyle.Danger);
+    embed.setTimestamp();
 
     const supportButton = new ButtonBuilder()
         .setLabel("Support Server")
@@ -128,10 +141,9 @@ export async function createInitialHelpMenu(client) {
         options,
     );
 
-    const buttonRow = new ActionRowBuilder().addComponents([
-        bugReportButton,
-        supportButton,
-    ]);
+    const buttonRow = new ActionRowBuilder().addComponents(
+        supportButton
+    );
 
     return {
         embeds: [embed],
@@ -141,16 +153,18 @@ export async function createInitialHelpMenu(client) {
 
 export default {
     slashOnly: true,
+
     data: new SlashCommandBuilder()
         .setName("help")
-        .setDescription("Displays the help menu with all available commands"),
+        .setDescription(
+            "Displays the help menu with all available commands"
+        ),
 
     async execute(interaction, guildConfig, client) {
-        
-        const { MessageFlags } = await import('discord.js');
         await InteractionHelper.safeDefer(interaction);
-        
-        const { embeds, components } = await createInitialHelpMenu(client);
+
+        const { embeds, components } =
+            await createInitialHelpMenu(client);
 
         await InteractionHelper.safeEditReply(interaction, {
             embeds,
@@ -165,7 +179,8 @@ export default {
 
                 const closedEmbed = createEmbed({
                     title: "Help menu closed",
-                    description: "Help menu has been closed, use /help again.",
+                    description:
+                        "Help menu has been closed, use /help again.",
                     color: "secondary",
                 });
 
@@ -174,7 +189,10 @@ export default {
                     components: [],
                 });
             } catch (error) {
-                logger.debug('Help menu close edit failed (interaction may have expired):', error?.message);
+                console.debug(
+                    "Help menu close edit failed (interaction may have expired):",
+                    error?.message
+                );
             }
         }, HELP_MENU_TIMEOUT_MS);
     },
