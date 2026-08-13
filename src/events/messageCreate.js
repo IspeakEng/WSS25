@@ -60,6 +60,7 @@ const TARGET_USER_ID = '1054967242497982476';
 // Custom emoji ID used for the reaction
 const REACTION_EMOJI_ID = '1528019310742867988';
 
+
 /*
  * ==========================================================================
  * MESSAGE CREATE
@@ -73,24 +74,30 @@ export default {
         try {
 
             // Ignore bots and DMs
-            if (message.author.bot || !message.guild) {
+            if (
+                message.author.bot ||
+                !message.guild
+            ) {
                 return;
             }
 
+
             /*
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              * AFK SYSTEM
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              */
 
             try {
+
                 const { getAFKKey } =
                     await import('../utils/database.js');
 
+
                 /*
-                 * ------------------------------------------------------------------
+                 * ----------------------------------------------------------------------
                  * REMOVE AFK WHEN AFK USER SENDS A MESSAGE
-                 * ------------------------------------------------------------------
+                 * ----------------------------------------------------------------------
                  */
 
                 const authorAFKKey =
@@ -118,25 +125,31 @@ export default {
                         }).catch(() => null);
 
                     if (welcomeBack) {
+
                         setTimeout(() => {
-                            welcomeBack.delete().catch(() => {});
+                            welcomeBack
+                                .delete()
+                                .catch(() => {});
                         }, 5000);
                     }
                 }
 
+
                 /*
-                 * ------------------------------------------------------------------
+                 * ----------------------------------------------------------------------
                  * CHECK MENTIONED USERS FOR AFK STATUS
-                 * ------------------------------------------------------------------
+                 * ----------------------------------------------------------------------
                  */
 
-                for (const [, mentionedUser] of message.mentions.users) {
+                for (
+                    const [, mentionedUser]
+                    of message.mentions.users
+                ) {
 
                     if (mentionedUser.bot) {
                         continue;
                     }
 
-                    // Don't check the message author again
                     if (
                         mentionedUser.id ===
                         message.author.id
@@ -172,7 +185,8 @@ export default {
                         let timestampMs;
 
                         if (
-                            typeof afkData.timestamp === 'number'
+                            typeof afkData.timestamp ===
+                            'number'
                         ) {
                             timestampMs =
                                 afkData.timestamp;
@@ -187,7 +201,9 @@ export default {
                             Number.isFinite(timestampMs)
                         ) {
                             timestampText =
-                                `<t:${Math.floor(timestampMs / 1000)}:R>`;
+                                `<t:${Math.floor(
+                                    timestampMs / 1000
+                                )}:R>`;
                         }
                     }
 
@@ -207,24 +223,45 @@ export default {
                 );
             }
 
+
             /*
              * ==========================================================================
              * AUTO MENTION REACTION
              * ==========================================================================
              *
-             * Whenever someone mentions TARGET_USER_ID,
-             * the bot reacts with REACTION_EMOJI_ID.
+             * When someone mentions TARGET_USER_ID,
+             * the bot reacts using the custom emoji.
              *
-             * =======================================================================
+             * ==========================================================================
              */
 
             try {
 
-                if (
+                const targetMentioned =
                     message.mentions.users.has(
                         TARGET_USER_ID
-                    )
+                    );
+
+                const rawMentionDetected =
+                    message.content.includes(
+                        `<@${TARGET_USER_ID}>`
+                    ) ||
+                    message.content.includes(
+                        `<@!${TARGET_USER_ID}>`
+                    );
+
+                if (
+                    targetMentioned ||
+                    rawMentionDetected
                 ) {
+
+                    logger.info(
+                        `🎯 Target user ${TARGET_USER_ID} was mentioned by ${message.author.tag}`
+                    );
+
+                    /*
+                     * Fetch the custom emoji from Discord.
+                     */
 
                     const reactionEmoji =
                         await client.emojis.fetch(
@@ -233,18 +270,22 @@ export default {
 
                     if (!reactionEmoji) {
 
-                        logger.warn(
-                            `Auto mention reaction emoji not found or inaccessible: ${REACTION_EMOJI_ID}`
+                        logger.error(
+                            `❌ Could not find/access emoji: ${REACTION_EMOJI_ID}`
                         );
 
                     } else {
+
+                        /*
+                         * Add reaction.
+                         */
 
                         await message.react(
                             reactionEmoji
                         );
 
                         logger.info(
-                            `Auto mention reaction added to message ${message.id}`
+                            `✅ Auto reaction added to message ${message.id}`
                         );
                     }
                 }
@@ -252,15 +293,16 @@ export default {
             } catch (error) {
 
                 logger.error(
-                    'Failed to add auto mention reaction:',
+                    '❌ Failed to add auto mention reaction:',
                     error
                 );
             }
 
+
             /*
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              * BAD WORD FILTER
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              */
 
             const badWords = [
@@ -283,8 +325,9 @@ export default {
                 message.content.toLowerCase();
 
             const containsBadWord =
-                badWords.some(word =>
-                    content.includes(word)
+                badWords.some(
+                    word =>
+                        content.includes(word)
                 );
 
             if (containsBadWord) {
@@ -300,7 +343,11 @@ export default {
                         });
 
                     setTimeout(() => {
-                        warning.delete().catch(() => {});
+
+                        warning
+                            .delete()
+                            .catch(() => {});
+
                     }, 5000);
 
                 } catch (error) {
@@ -314,20 +361,22 @@ export default {
                 return;
             }
 
+
             /*
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              * MESSAGE LOG
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              */
 
             logger.debug(
                 `Message received from ${message.author.tag}: ${message.content}`
             );
 
+
             /*
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              * COUNTING GAME
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              */
 
             const countingProcessed =
@@ -340,16 +389,28 @@ export default {
                 return;
             }
 
+
             /*
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              * PREFIX COMMAND
-             * ----------------------------------------------------------------------
+             * ==========================================================================
              */
 
             await handlePrefixCommand(
                 message,
                 client
             );
+
+
+            /*
+             * ==========================================================================
+             * LEVELING
+             * ==========================================================================
+             *
+             * Leveling is currently disabled.
+             *
+             * ==========================================================================
+             */
 
         } catch (error) {
 
@@ -361,13 +422,17 @@ export default {
     },
 };
 
+
 /*
  * ==========================================================================
  * PREFIX COMMAND
  * ==========================================================================
  */
 
-async function handlePrefixCommand(message, client) {
+async function handlePrefixCommand(
+    message,
+    client
+) {
 
     try {
 
@@ -396,10 +461,11 @@ async function handlePrefixCommand(message, client) {
             args,
         } = parsed;
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * MUSIC SHORTCUTS
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         const musicPrefixShortcut =
@@ -433,10 +499,11 @@ async function handlePrefixCommand(message, client) {
             `Prefix command detected: ${commandName}, args: ${args.join(', ')}`
         );
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * RESOLVE COMMAND
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         const resolvedCommandName =
@@ -462,15 +529,18 @@ async function handlePrefixCommand(message, client) {
             return;
         }
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * MAINTENANCE
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         if (
             isMaintenanceMode() &&
-            !isBotOwner(message.author.id)
+            !isBotOwner(
+                message.author.id
+            )
         ) {
 
             await message.channel.send({
@@ -489,10 +559,11 @@ async function handlePrefixCommand(message, client) {
             return;
         }
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * CATEGORY
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         if (
@@ -517,10 +588,11 @@ async function handlePrefixCommand(message, client) {
             return;
         }
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * PREFIX RESTRICTION
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         const restriction =
@@ -531,7 +603,9 @@ async function handlePrefixCommand(message, client) {
             );
 
         if (
-            !supportsPrefixExecution(command) ||
+            !supportsPrefixExecution(
+                command
+            ) ||
             restriction.blocked
         ) {
 
@@ -556,10 +630,11 @@ async function handlePrefixCommand(message, client) {
             return;
         }
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * COMMAND ENABLED
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         const accessKey =
@@ -593,15 +668,19 @@ async function handlePrefixCommand(message, client) {
             return;
         }
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * ABUSE PROTECTION
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         const mockInteractionForProtection = {
-            guildId: message.guild.id,
-            user: message.author,
+            guildId:
+                message.guild.id,
+
+            user:
+                message.author,
         };
 
         const abuseProtection =
@@ -611,7 +690,9 @@ async function handlePrefixCommand(message, client) {
                 resolvedCommandName
             );
 
-        if (!abuseProtection.allowed) {
+        if (
+            !abuseProtection.allowed
+        ) {
 
             const formattedCooldown =
                 formatCooldownDuration(
@@ -633,10 +714,11 @@ async function handlePrefixCommand(message, client) {
             return;
         }
 
+
         /*
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          * EXECUTE COMMAND
-         * ------------------------------------------------------------------------
+         * ----------------------------------------------------------------------
          */
 
         logger.info(
@@ -661,13 +743,17 @@ async function handlePrefixCommand(message, client) {
     }
 }
 
+
 /*
  * ==========================================================================
  * COUNTING GAME
  * ==========================================================================
  */
 
-async function handleCountingGame(message, client) {
+async function handleCountingGame(
+    message,
+    client
+) {
 
     try {
 
@@ -680,7 +766,8 @@ async function handleCountingGame(message, client) {
         if (
             !config.enabled ||
             !config.channelId ||
-            message.channel.id !== config.channelId
+            message.channel.id !==
+                config.channelId
         ) {
 
             return false;
@@ -697,11 +784,13 @@ async function handleCountingGame(message, client) {
 
         const invalidAttempt =
             !validCount ||
-            message.author.id === config.lastUserId;
+            message.author.id ===
+                config.lastUserId;
 
         if (invalidAttempt) {
 
-            await message.delete().catch(() => {});
+            await message.delete()
+                .catch(() => {});
 
             await saveCountingGameConfig(
                 client,
@@ -720,9 +809,11 @@ async function handleCountingGame(message, client) {
                 );
 
             setTimeout(() => {
+
                 failureMessage
                     .delete()
                     .catch(() => {});
+
             }, 10000);
 
             return true;
