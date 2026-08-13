@@ -1,12 +1,6 @@
 import { Events } from 'discord.js';
 import { logger } from '../utils/logger.js';
 
-import {
-    getLevelingConfig,
-    getUserLevelData,
-} from '../services/leveling/leveling.js';
-
-import { addXp } from '../services/leveling/xpSystem.js';
 import { checkRateLimit } from '../utils/rateLimiter.js';
 import { parsePrefixCommand } from '../utils/prefixParser.js';
 
@@ -68,7 +62,6 @@ const MESSAGE_XP_RATE_LIMIT_WINDOW_MS = 10000;
 const TARGET_USER_ID = '1054967242497982476';
 
 // Custom emoji ID used for the reaction
-// CHANGE THIS ID if you want a different emoji
 const REACTION_EMOJI_ID = '1528022603770630185';
 
 /*
@@ -228,27 +221,15 @@ export default {
              * ==========================================================================
              * AUTO MENTION REACTION
              * ==========================================================================
-             *
-             * The bot reacts whenever TARGET_USER_ID is mentioned.
-             *
-             * This works even if the message is a reply.
              */
 
             try {
 
-                // Check if target user was mentioned
                 if (
                     message.mentions.users.has(
                         TARGET_USER_ID
                     )
                 ) {
-
-                    /*
-                     * Fetch the custom emoji from Discord.
-                     *
-                     * This helps make sure the emoji exists
-                     * and the bot can access it.
-                     */
 
                     const reactionEmoji =
                         await client.emojis.fetch(
@@ -262,10 +243,6 @@ export default {
                         );
 
                     } else {
-
-                        /*
-                         * Add reaction to the message
-                         */
 
                         await message.react(
                             reactionEmoji
@@ -383,12 +360,15 @@ export default {
              * ----------------------------------------------------------------------
              * LEVELING
              * ----------------------------------------------------------------------
+             *
+             * Leveling has been completely disabled.
+             *
+             * No XP is awarded here.
+             * No leveling services are imported.
+             * No leveling database/config is accessed.
+             *
+             * ----------------------------------------------------------------------
              */
-
-            await handleLeveling(
-                message,
-                client
-            );
 
         } catch (error) {
 
@@ -783,240 +763,5 @@ async function handleCountingGame(message, client) {
         );
 
         return false;
-    }
-}
-
-/*
- * ==========================================================================
- * LEVELING
- * ==========================================================================
- */
-
-async function handleLeveling(message, client) {
-
-    try {
-
-        const rateLimitKey =
-            `xp-event:${message.guild.id}:${message.author.id}`;
-
-        const canProcess =
-            await checkRateLimit(
-                rateLimitKey,
-                MESSAGE_XP_RATE_LIMIT_ATTEMPTS,
-                MESSAGE_XP_RATE_LIMIT_WINDOW_MS
-            );
-
-        if (!canProcess) {
-            return;
-        }
-
-        const levelingConfig =
-            await getLevelingConfig(
-                client,
-                message.guild.id
-            );
-
-        if (!levelingConfig?.enabled) {
-            return;
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * IGNORED CHANNELS
-         * ------------------------------------------------------------------------
-         */
-
-        if (
-            levelingConfig.ignoredChannels?.includes(
-                message.channel.id
-            )
-        ) {
-
-            return;
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * IGNORED ROLES
-         * ------------------------------------------------------------------------
-         */
-
-        if (
-            levelingConfig.ignoredRoles?.length > 0
-        ) {
-
-            const member =
-                await message.guild.members
-                    .fetch(message.author.id)
-                    .catch(() => null);
-
-            if (
-                member &&
-                member.roles.cache.some(
-                    role =>
-                        levelingConfig.ignoredRoles.includes(
-                            role.id
-                        )
-                )
-            ) {
-
-                return;
-            }
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * BLACKLISTED USERS
-         * ------------------------------------------------------------------------
-         */
-
-        if (
-            levelingConfig.blacklistedUsers?.includes(
-                message.author.id
-            )
-        ) {
-
-            return;
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * EMPTY MESSAGE
-         * ------------------------------------------------------------------------
-         */
-
-        if (
-            !message.content ||
-            message.content.trim().length === 0
-        ) {
-
-            return;
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * USER DATA
-         * ------------------------------------------------------------------------
-         */
-
-        const userData =
-            await getUserLevelData(
-                client,
-                message.guild.id,
-                message.author.id
-            );
-
-        /*
-         * ------------------------------------------------------------------------
-         * XP COOLDOWN
-         * ------------------------------------------------------------------------
- */
-
-        const cooldownTime =
-            levelingConfig.xpCooldown || 60;
-
-        const now =
-            Date.now();
-
-        const timeSinceLastMessage =
-            now -
-            (userData.lastMessage || 0);
-
-        if (
-            timeSinceLastMessage <
-            cooldownTime * 1000
-        ) {
-
-            return;
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * XP RANGE
-         * ------------------------------------------------------------------------
-         */
-
-        const minXP =
-            levelingConfig.xpRange?.min ||
-            levelingConfig.xpPerMessage?.min ||
-            15;
-
-        const maxXP =
-            levelingConfig.xpRange?.max ||
-            levelingConfig.xpPerMessage?.max ||
-            25;
-
-        const safeMinXP =
-            Math.max(
-                1,
-                minXP
-            );
-
-        const safeMaxXP =
-            Math.max(
-                safeMinXP,
-                maxXP
-            );
-
-        const xpToGive =
-            Math.floor(
-                Math.random() *
-                (safeMaxXP - safeMinXP + 1)
-            ) + safeMinXP;
-
-        /*
-         * ------------------------------------------------------------------------
-         * XP MULTIPLIER
-         * ------------------------------------------------------------------------
-         */
-
-        let finalXP =
-            xpToGive;
-
-        if (
-            levelingConfig.xpMultiplier &&
-            levelingConfig.xpMultiplier > 1
-        ) {
-
-            finalXP =
-                Math.floor(
-                    finalXP *
-                    levelingConfig.xpMultiplier
-                );
-        }
-
-        /*
-         * ------------------------------------------------------------------------
-         * ADD XP
-         * ------------------------------------------------------------------------
-         */
-
-        const result =
-            await addXp(
-                client,
-                message.guild,
-                message.member,
-                finalXP
-            );
-
-        /*
-         * ------------------------------------------------------------------------
-         * LEVEL UP
-         * ------------------------------------------------------------------------
-         */
-
-        if (result?.leveledUp) {
-
-            logger.info(
-                `${message.author.tag} leveled up to level ${result.level} in ${message.guild.name}`
-            );
-        }
-
-    } catch (error) {
-
-        logger.error(
-            'Error handling leveling for message:',
-            error
-        );
     }
 }
