@@ -55,11 +55,20 @@ import {
  * ==========================================================================
  */
 
-// Your Discord User ID
+// YOUR Discord User ID
 const TARGET_USER_ID = '1054967242497982476';
 
-// Custom emoji ID
-const REACTION_EMOJI_ID = '1528019310742867988';
+// Your custom reaction emoji ID
+const TARGET_REACTION_EMOJIS = [
+    '1528022603770630185',
+];
+
+
+// FRIEND'S Discord User ID
+const FRIEND_USER_ID = '1498287924301795388';
+
+// Friend mention reaction emoji
+const FRIEND_REACTION_EMOJI = '💖';
 
 
 /*
@@ -233,109 +242,98 @@ export default {
 
             /*
              * ==========================================================================
-             * AUTO MENTION REACTION
-             * ==========================================================================
-             *
-             * Whenever someone mentions the target user,
-             * the bot automatically reacts to that message.
-             *
+             * AUTO MENTION REACTIONS
              * ==========================================================================
              */
 
             try {
 
                 /*
-                 * Discord's official mention collection
+                 * ----------------------------------------------------------------------
+                 * CHECK IF YOU WERE MENTIONED
+                 * ----------------------------------------------------------------------
                  */
 
                 const targetMentioned =
-                    message.mentions.users.some(
-                        user =>
-                            user.id === TARGET_USER_ID
+                    message.mentions.users.has(
+                        TARGET_USER_ID
                     );
 
 
                 /*
-                 * Extra fallback check.
-                 *
-                 * Discord mentions can appear as:
-                 *
-                 * <@USER_ID>
-                 * <@!USER_ID>
+                 * ----------------------------------------------------------------------
+                 * CHECK IF FRIEND WAS MENTIONED
+                 * ----------------------------------------------------------------------
                  */
 
-                const rawMentionDetected =
-                    message.content.includes(
-                        `<@${TARGET_USER_ID}>`
-                    ) ||
-                    message.content.includes(
-                        `<@!${TARGET_USER_ID}>`
+                const friendMentioned =
+                    message.mentions.users.has(
+                        FRIEND_USER_ID
                     );
 
 
                 /*
-                 * If the target user was mentioned,
-                 * add the custom emoji reaction.
+                 * ----------------------------------------------------------------------
+                 * REACT WHEN YOU ARE MENTIONED
+                 * ----------------------------------------------------------------------
                  */
 
-                if (
-                    targetMentioned ||
-                    rawMentionDetected
-                ) {
+                if (targetMentioned) {
 
                     logger.info(
-                        `🎯 ${message.author.tag} mentioned target user ${TARGET_USER_ID}`
+                        `🎯 ${message.author.tag} mentioned ${TARGET_USER_ID}`
                     );
 
 
-                    /*
-                     * Fetch emoji from Discord.
-                     */
+                    for (
+                        const emojiId
+                        of TARGET_REACTION_EMOJIS
+                    ) {
 
-                    const reactionEmoji =
-                        await client.emojis.fetch(
-                            REACTION_EMOJI_ID
-                        ).catch(error => {
+                        await message
+                            .react(emojiId)
+                            .catch(error => {
+
+                                logger.error(
+                                    `❌ Failed to react with emoji ${emojiId}:`,
+                                    error
+                                );
+
+                            });
+                    }
+                }
+
+
+                /*
+                 * ----------------------------------------------------------------------
+                 * REACT WHEN FRIEND IS MENTIONED
+                 * ----------------------------------------------------------------------
+                 */
+
+                if (friendMentioned) {
+
+                    logger.info(
+                        `💖 ${message.author.tag} mentioned friend ${FRIEND_USER_ID}`
+                    );
+
+
+                    await message
+                        .react(FRIEND_REACTION_EMOJI)
+                        .catch(error => {
 
                             logger.error(
-                                `❌ Failed to fetch reaction emoji ${REACTION_EMOJI_ID}:`,
+                                '❌ Failed to react with friend emoji:',
                                 error
                             );
 
-                            return null;
                         });
-
-
-                    /*
-                     * Emoji unavailable
-                     */
-
-                    if (!reactionEmoji) {
-
-                        logger.error(
-                            `❌ Reaction emoji ${REACTION_EMOJI_ID} was not found or cannot be accessed by the bot.`
-                        );
-
-                    } else {
-
-                        /*
-                         * React to the message.
-                         */
-
-                        await message.react(
-                            reactionEmoji
-                        );
-
-                        logger.info(
-                            `✅ Auto mention reaction added to message ${message.id}`
-                        );
-                    }
                 }
+
 
             } catch (error) {
 
                 logger.error(
-                    '❌ Failed to add auto mention reaction:',
+                    '❌ Failed to handle auto mention reactions:',
                     error
                 );
             }
@@ -443,22 +441,6 @@ export default {
                 client
             );
 
-
-            /*
-             * ==========================================================================
-             * LEVELING
-             * ==========================================================================
-             *
-             * Leveling is completely disabled.
-             *
-             * There are NO imports or calls to:
-             *
-             * - leveling.js
-             * - xpSystem.js
-             * - levelRoleSyncService.js
-             *
-             * ==========================================================================
-             */
 
         } catch (error) {
 
@@ -796,6 +778,25 @@ async function handlePrefixCommand(
  * ==========================================================================
  * COUNTING GAME
  * ==========================================================================
+ *
+ * WRONG COUNT BEHAVIOR:
+ *
+ * 1
+ * 2
+ * 3
+ * 8  <- WRONG
+ *
+ * The 8 message is deleted.
+ *
+ * The game continues:
+ *
+ * 4
+ * 5
+ * 6
+ *
+ * It does NOT reset to 1.
+ *
+ * ==========================================================================
  */
 
 async function handleCountingGame(
@@ -805,11 +806,24 @@ async function handleCountingGame(
 
     try {
 
+        /*
+         * ----------------------------------------------------------------------
+         * GET COUNTING CONFIG
+         * ----------------------------------------------------------------------
+         */
+
         const config =
             await getCountingGameConfig(
                 client,
                 message.guild.id
             );
+
+
+        /*
+         * ----------------------------------------------------------------------
+         * CHECK IF COUNTING GAME IS ACTIVE
+         * ----------------------------------------------------------------------
+         */
 
         if (
             !config.enabled ||
@@ -821,8 +835,22 @@ async function handleCountingGame(
             return false;
         }
 
+
+        /*
+         * ----------------------------------------------------------------------
+         * GET MESSAGE CONTENT
+         * ----------------------------------------------------------------------
+         */
+
         const content =
             message.content.trim();
+
+
+        /*
+         * ----------------------------------------------------------------------
+         * CHECK NUMBER
+         * ----------------------------------------------------------------------
+         */
 
         const validCount =
             isValidCountingMessage(
@@ -830,42 +858,113 @@ async function handleCountingGame(
                 config
             );
 
-        const invalidAttempt =
-            !validCount ||
-            message.author.id ===
-                config.lastUserId;
 
-        if (invalidAttempt) {
+        /*
+         * ----------------------------------------------------------------------
+         * CHECK SAME USER
+         * ----------------------------------------------------------------------
+         *
+         * Same person cannot count twice consecutively.
+         *
+         * Example:
+         *
+         * User A: 1
+         * User A: 2  <- deleted
+         *
+         * The count remains at 2.
+         *
+         * ----------------------------------------------------------------------
+         */
+
+        const sameUserAttempt =
+            message.author.id ===
+            config.lastUserId;
+
+
+        /*
+         * ----------------------------------------------------------------------
+         * WRONG COUNT
+         * ----------------------------------------------------------------------
+         */
+
+        if (
+            !validCount ||
+            sameUserAttempt
+        ) {
+
+            /*
+             * Delete ONLY the incorrect message.
+             */
 
             await message.delete()
                 .catch(() => {});
 
-            await saveCountingGameConfig(
-                client,
-                message.guild.id,
-                {
-                    ...config,
-                    nextNumber: 1,
-                    lastUserId: null,
-                    currentStreak: 0,
-                }
-            );
 
-            const failureMessage =
-                await message.channel.send(
-                    `❌ Count broken by <@${message.author.id}>. The sequence has been reset to **1**.`
-                );
+            /*
+             * IMPORTANT:
+             *
+             * We DO NOT modify:
+             *
+             * - nextNumber
+             * - lastUserId
+             * - currentStreak
+             *
+             * Therefore the counting sequence stays where
+             * it was before the wrong message.
+             */
 
-            setTimeout(() => {
 
-                failureMessage
-                    .delete()
-                    .catch(() => {});
+            const expectedNumber =
+                config.nextNumber;
 
-            }, 10000);
+
+            /*
+             * ------------------------------------------------------------------
+             * WARNING
+             * ------------------------------------------------------------------
+             */
+
+            const warningMessage =
+                await message.channel.send({
+
+                    content:
+                        sameUserAttempt
+                            ? `⚠️ <@${message.author.id}>, you can't count twice in a row. Continue with **${expectedNumber}**.`
+                            : `❌ Wrong count, <@${message.author.id}>. Continue with **${expectedNumber}**.`,
+
+                }).catch(() => null);
+
+
+            /*
+             * Delete warning after 5 seconds.
+             */
+
+            if (warningMessage) {
+
+                setTimeout(() => {
+
+                    warningMessage
+                        .delete()
+                        .catch(() => {});
+
+                }, 5000);
+            }
+
+
+            /*
+             * Stop this message from being treated
+             * as a normal bot command.
+             */
 
             return true;
         }
+
+
+        /*
+         * ----------------------------------------------------------------------
+         * CORRECT COUNT
+         * ----------------------------------------------------------------------
+         */
 
         await recordCorrectCount(
             client,
@@ -873,7 +972,15 @@ async function handleCountingGame(
             message.author.id
         );
 
+
+        /*
+         * ----------------------------------------------------------------------
+         * DONE
+         * ----------------------------------------------------------------------
+         */
+
         return true;
+
 
     } catch (error) {
 
