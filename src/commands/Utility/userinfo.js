@@ -20,147 +20,265 @@ export default {
       logger.warn(`UserInfo interaction defer failed`, {
         userId: interaction.user.id,
         guildId: interaction.guildId,
-        commandName: 'userinfo'
+        commandName: "userinfo",
       });
       return;
     }
 
-    const user =
-      interaction.options.getUser("target") || interaction.user;
+    try {
+      // ─────────────────────────────────────────────
+      // USER
+      // ─────────────────────────────────────────────
 
-    const member = interaction.guild.members.cache.get(user.id);
+      const user =
+        interaction.options.getUser("target") || interaction.user;
 
-    // ──────────────── TIMESTAMPS ────────────────
+      // Fetch the member directly so roles/join date are accurate
+      const member = await interaction.guild.members
+        .fetch(user.id)
+        .catch(() => null);
 
-    const createdTimestamp = Math.floor(
-      user.createdAt.getTime() / 1000
-    );
+      // ─────────────────────────────────────────────
+      // ACCOUNT CREATION
+      // ─────────────────────────────────────────────
 
-    const joinedTimestamp = member?.joinedAt
-      ? Math.floor(member.joinedAt.getTime() / 1000)
-      : null;
+      const createdDate = new Date(user.createdTimestamp);
 
-    // ──────────────── ROLES ────────────────
+      const createdTimestamp = Math.floor(
+        user.createdTimestamp / 1000
+      );
 
-    const roles = member
-      ? member.roles.cache
-          .filter((role) => role.id !== interaction.guild.id)
-          .sort((a, b) => b.position - a.position)
-      : [];
+      // Bangladesh time
+      const bdDate = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Dhaka",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(createdDate);
 
-    const roleList =
-      roles.length > 0
-        ? roles
-            .slice(0, 10)
-            .map((role) => `<@&${role.id}>`)
-            .join("  ")
-        : "`None`";
+      const bdTime = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Dhaka",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      }).format(createdDate);
 
-    const moreRoles =
-      roles.length > 10
-        ? `\n> ✦ *+${roles.length - 10} more role(s)*`
-        : "";
+      // ─────────────────────────────────────────────
+      // MORNING / AFTERNOON / EVENING / NIGHT
+      // ─────────────────────────────────────────────
 
-    // ──────────────── STATUS ────────────────
+      const bdHour = Number(
+        new Intl.DateTimeFormat("en-US", {
+          timeZone: "Asia/Dhaka",
+          hour: "numeric",
+          hour12: false,
+        }).format(createdDate)
+      );
 
-    const botStatus = user.bot
-      ? "✦ Yes"
-      : "✦ No";
+      let timePeriod;
+      let periodIcon;
 
-    // ──────────────── EMBED ────────────────
+      if (bdHour >= 5 && bdHour < 12) {
+        timePeriod = "Morning";
+        periodIcon = "☀️";
+      } else if (bdHour >= 12 && bdHour < 17) {
+        timePeriod = "Afternoon";
+        periodIcon = "🌤️";
+      } else if (bdHour >= 17 && bdHour < 20) {
+        timePeriod = "Evening";
+        periodIcon = "🌆";
+      } else {
+        timePeriod = "Night";
+        periodIcon = "🌙";
+      }
 
-    const embed = createEmbed({
-      title: "✦・USER INFORMATION・✦",
-      description:
-        `╭─────────────── ⟡ ───────────────╮\n` +
-        `        **${user.displayName || user.username}**\n` +
-        `╰─────────────── ⟡ ───────────────╯`
-    })
-      .setThumbnail(
-        user.displayAvatarURL({
-          dynamic: true,
-          size: 512
+      // ─────────────────────────────────────────────
+      // SERVER JOIN DATE
+      // ─────────────────────────────────────────────
+
+      const joinedTimestamp = member?.joinedTimestamp
+        ? Math.floor(member.joinedTimestamp / 1000)
+        : null;
+
+      // ─────────────────────────────────────────────
+      // ROLES
+      // ─────────────────────────────────────────────
+
+      const roles = member
+        ? member.roles.cache
+            .filter((role) => role.id !== interaction.guild.id)
+            .sort((a, b) => b.position - a.position)
+        : [];
+
+      let roleText = "No additional roles";
+
+      if (roles.length > 0) {
+        roleText = roles
+          .slice(0, 15)
+          .map((role) => `<@&${role.id}>`)
+          .join("  ");
+
+        if (roles.length > 15) {
+          roleText += `\n> ✦ *+${roles.length - 15} more role(s)*`;
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // HIGHEST ROLE
+      // ─────────────────────────────────────────────
+
+      const highestRole =
+        member?.roles?.highest &&
+        member.roles.highest.id !== interaction.guild.id
+          ? member.roles.highest.toString()
+          : "No additional role";
+
+      // ─────────────────────────────────────────────
+      // DISPLAY NAME
+      // ─────────────────────────────────────────────
+
+      const displayName =
+        member?.displayName ||
+        user.globalName ||
+        user.username;
+
+      // ─────────────────────────────────────────────
+      // EMBED
+      // ─────────────────────────────────────────────
+
+      const embed = createEmbed({
+        title: "✦・USER INFORMATION・✦",
+
+        description:
+          `╭──────────────────────────────╮\n` +
+          `\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003**${displayName}**\n` +
+          `╰──────────────────────────────╯`,
+      })
+
+        // ─────────────────────────────────────────
+        // AVATAR
+        // ─────────────────────────────────────────
+
+        .setThumbnail(
+          user.displayAvatarURL({
+            dynamic: true,
+            size: 512,
+          })
+        )
+
+        .setAuthor({
+          name: user.tag,
+          iconURL: user.displayAvatarURL({
+            dynamic: true,
+            size: 128,
+          }),
         })
-      )
-      .setAuthor({
-        name: `${user.tag}`,
-        iconURL: user.displayAvatarURL({
-          dynamic: true,
-          size: 128
+
+        // ─────────────────────────────────────────
+        // IDENTITY
+        // ─────────────────────────────────────────
+
+        .addFields({
+          name: "╭─ ✦ ɪᴅᴇɴᴛɪᴛʏ",
+          value:
+            `> **Username** ── \`${user.username}\`\n` +
+            `> **Display Name** ── ${displayName}\n` +
+            `> **User ID** ── \`${user.id}\``,
+          inline: false,
         })
-      })
 
-      // ───────── IDENTITY ─────────
+        // ─────────────────────────────────────────
+        // SERVER
+        // ─────────────────────────────────────────
 
-      .addFields({
-        name: "╭─ ✦ ɪᴅᴇɴᴛɪᴛʏ",
-        value:
-          `> **Username**  ── \`${user.username}\`\n` +
-          `> **Display**  ── ${user.displayName || user.username}\n` +
-          `> **ID**  ── \`${user.id}\``,
-        inline: true
-      })
-
-      // ───────── SERVER ─────────
-
-      .addFields({
-        name: "╭─ ◈ sᴇʀᴠᴇʀ",
-        value:
-          `> **Joined**  ── ${
-            joinedTimestamp
-              ? `<t:${joinedTimestamp}:R>`
-              : "`Not in server`"
-          }\n` +
-          `> **Highest Role**  ── ${
-            member?.roles?.highest
-              ? member.roles.highest.toString()
-              : "`None`"
-          }`,
-        inline: true
-      })
-
-      // ───────── ACCOUNT ─────────
-
-      .addFields({
-        name: "╭─ ⟡ ᴀᴄᴄᴏᴜɴᴛ",
-        value:
-          `> **Bot**  ── ${botStatus}\n` +
-          `> **Created**  ── <t:${createdTimestamp}:R>`,
-        inline: true
-      })
-
-      // ───────── ROLES ─────────
-
-      .addFields({
-        name: "╭─ ✧ ʀᴏʟᴇs",
-        value:
-          `> ${roleList}` +
-          moreRoles,
-        inline: false
-      })
-
-      // ───────── FOOTER ─────────
-
-      .setFooter({
-        text: `✦ Requested by ${interaction.user.tag}  •  ${interaction.guild.name}`,
-        iconURL: interaction.user.displayAvatarURL({
-          dynamic: true,
-          size: 64
+        .addFields({
+          name: "╭─ ◈ sᴇʀᴠᴇʀ",
+          value:
+            `> **Joined** ── ${
+              joinedTimestamp
+                ? `<t:${joinedTimestamp}:R>`
+                : "`Not in server`"
+            }\n` +
+            `> **Highest Role** ── ${highestRole}`,
+          inline: true,
         })
-      })
 
-      .setTimestamp();
+        // ─────────────────────────────────────────
+        // ACCOUNT
+        // ─────────────────────────────────────────
 
-    // ──────────────── SEND ────────────────
+        .addFields({
+          name: "╭─ ⟡ ᴀᴄᴄᴏᴜɴᴛ",
+          value:
+            `> **Bot** ── ${user.bot ? "✦ Yes" : "✦ No"}\n` +
+            `> **Created** ── <t:${createdTimestamp}:R>`,
+          inline: true,
+        })
 
-    await InteractionHelper.safeEditReply(interaction, {
-      embeds: [embed]
-    });
+        // ─────────────────────────────────────────
+        // CREATION TIME
+        // ─────────────────────────────────────────
 
-    logger.info(`UserInfo command executed`, {
-      userId: interaction.user.id,
-      targetUserId: user.id,
-      guildId: interaction.guildId
-    });
+        .addFields({
+          name: "╭─ ◌ ᴄʀᴇᴀᴛɪᴏɴ ᴛɪᴍᴇ",
+          value:
+            `> **Date** ── ${bdDate}\n` +
+            `> **Time** ── ${bdTime} (BD)\n` +
+            `> **Period** ── ${periodIcon} ${timePeriod}`,
+          inline: false,
+        })
+
+        // ─────────────────────────────────────────
+        // ROLES
+        // ─────────────────────────────────────────
+
+        .addFields({
+          name: "╭─ ✧ ʀᴏʟᴇs",
+          value: `> ${roleText}`,
+          inline: false,
+        })
+
+        // ─────────────────────────────────────────
+        // FOOTER
+        // ─────────────────────────────────────────
+
+        .setFooter({
+          text: `✦ Requested by ${interaction.user.tag}  •  ${interaction.guild.name}`,
+          iconURL: interaction.user.displayAvatarURL({
+            dynamic: true,
+            size: 64,
+          }),
+        })
+
+        .setTimestamp();
+
+      // ─────────────────────────────────────────────
+      // SEND
+      // ─────────────────────────────────────────────
+
+      await InteractionHelper.safeEditReply(interaction, {
+        embeds: [embed],
+      });
+
+      logger.info(`UserInfo command executed`, {
+        userId: interaction.user.id,
+        targetUserId: user.id,
+        guildId: interaction.guildId,
+      });
+
+    } catch (error) {
+      logger.error(`UserInfo command failed`, {
+        error: error?.message || error,
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+      });
+
+      await InteractionHelper.safeEditReply(interaction, {
+        content:
+          "✦ Something went wrong while fetching this user's information.",
+        embeds: [],
+      }).catch(() => {});
+    }
   },
 };
