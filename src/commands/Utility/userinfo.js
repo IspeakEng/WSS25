@@ -33,9 +33,16 @@ export default {
       const user =
         interaction.options.getUser("target") || interaction.user;
 
-      // Fetch the member directly so roles/join date are accurate
+      // Fetch all guild roles first
+      // This makes sure member role objects are available.
+      await interaction.guild.roles.fetch();
+
+      // Force-fetch the actual member
       const member = await interaction.guild.members
-        .fetch(user.id)
+        .fetch({
+          user: user.id,
+          force: true,
+        })
         .catch(() => null);
 
       // ─────────────────────────────────────────────
@@ -48,7 +55,7 @@ export default {
         user.createdTimestamp / 1000
       );
 
-      // Bangladesh time
+      // Bangladesh date
       const bdDate = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Asia/Dhaka",
         day: "2-digit",
@@ -56,6 +63,7 @@ export default {
         year: "numeric",
       }).format(createdDate);
 
+      // Bangladesh time
       const bdTime = new Intl.DateTimeFormat("en-US", {
         timeZone: "Asia/Dhaka",
         hour: "2-digit",
@@ -65,7 +73,7 @@ export default {
       }).format(createdDate);
 
       // ─────────────────────────────────────────────
-      // MORNING / AFTERNOON / EVENING / NIGHT
+      // TIME PERIOD
       // ─────────────────────────────────────────────
 
       const bdHour = Number(
@@ -105,22 +113,26 @@ export default {
       // ROLES
       // ─────────────────────────────────────────────
 
-      const roles = member
-        ? member.roles.cache
-            .filter((role) => role.id !== interaction.guild.id)
-            .sort((a, b) => b.position - a.position)
-        : [];
-
       let roleText = "No additional roles";
 
-      if (roles.length > 0) {
-        roleText = roles
-          .slice(0, 15)
-          .map((role) => `<@&${role.id}>`)
-          .join("  ");
+      if (member) {
+        const roleIds = [...member.roles.cache.keys()]
+          .filter((roleId) => roleId !== interaction.guild.id);
 
-        if (roles.length > 15) {
-          roleText += `\n> ✦ *+${roles.length - 15} more role(s)*`;
+        const roles = roleIds
+          .map((roleId) => interaction.guild.roles.cache.get(roleId))
+          .filter(Boolean)
+          .sort((a, b) => b.position - a.position);
+
+        if (roles.length > 0) {
+          roleText = roles
+            .slice(0, 20)
+            .map((role) => `<@&${role.id}>`)
+            .join("  ");
+
+          if (roles.length > 20) {
+            roleText += `\n> ✦ *+${roles.length - 20} more role(s)*`;
+          }
         }
       }
 
@@ -128,11 +140,15 @@ export default {
       // HIGHEST ROLE
       // ─────────────────────────────────────────────
 
-      const highestRole =
-        member?.roles?.highest &&
-        member.roles.highest.id !== interaction.guild.id
-          ? member.roles.highest.toString()
-          : "No additional role";
+      let highestRole = "No additional role";
+
+      if (member?.roles?.highest) {
+        const highest = member.roles.highest;
+
+        if (highest.id !== interaction.guild.id) {
+          highestRole = highest.toString();
+        }
+      }
 
       // ─────────────────────────────────────────────
       // DISPLAY NAME
