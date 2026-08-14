@@ -58,16 +58,16 @@ import {
 // YOUR Discord User ID
 const TARGET_USER_ID = '1054967242497982476';
 
-// Your custom reaction emoji ID
+// Your custom emoji ID
 const TARGET_REACTION_EMOJIS = [
-    '🧣',
+    '1528022603770630185',
 ];
 
 
 // FRIEND'S Discord User ID
 const FRIEND_USER_ID = '1498287924301795388';
 
-// Friend mention reaction emoji
+// Friend reaction emoji
 const FRIEND_REACTION_EMOJI = '💖';
 
 
@@ -81,10 +81,13 @@ export default {
     name: Events.MessageCreate,
 
     async execute(message, client) {
+
         try {
 
             /*
-             * Ignore bots and DMs
+             * ----------------------------------------------------------------------
+             * IGNORE BOTS AND DMs
+             * ----------------------------------------------------------------------
              */
 
             if (
@@ -203,9 +206,12 @@ export default {
                             typeof afkData.timestamp ===
                             'number'
                         ) {
+
                             timestampMs =
                                 afkData.timestamp;
+
                         } else {
+
                             timestampMs =
                                 Date.parse(
                                     afkData.timestamp
@@ -244,91 +250,111 @@ export default {
              * ==========================================================================
              * AUTO MENTION REACTIONS
              * ==========================================================================
+             *
+             * IMPORTANT:
+             *
+             * Reactions ONLY happen on normal messages.
+             *
+             * If the message is a REPLY, reactions are skipped.
+             *
+             * Other systems like AFK, bad words, counting and commands
+             * will still continue normally.
+             *
+             * ==========================================================================
              */
 
             try {
 
                 /*
                  * ----------------------------------------------------------------------
-                 * CHECK IF YOU WERE MENTIONED
+                 * ONLY RUN AUTO REACTION IF THIS IS NOT A REPLY
                  * ----------------------------------------------------------------------
                  */
 
-                const targetMentioned =
-                    message.mentions.users.has(
-                        TARGET_USER_ID
-                    );
+                if (!message.reference) {
+
+                    /*
+                     * ------------------------------------------------------------------
+                     * CHECK IF YOU WERE MENTIONED
+                     * ------------------------------------------------------------------
+                     */
+
+                    const targetMentioned =
+                        message.mentions.users.has(
+                            TARGET_USER_ID
+                        );
 
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * CHECK IF FRIEND WAS MENTIONED
-                 * ----------------------------------------------------------------------
-                 */
+                    /*
+                     * ------------------------------------------------------------------
+                     * CHECK IF FRIEND WAS MENTIONED
+                     * ------------------------------------------------------------------
+                     */
 
-                const friendMentioned =
-                    message.mentions.users.has(
-                        FRIEND_USER_ID
-                    );
-
-
-                /*
-                 * ----------------------------------------------------------------------
-                 * REACT WHEN YOU ARE MENTIONED
-                 * ----------------------------------------------------------------------
-                 */
-
-                if (targetMentioned) {
-
-                    logger.info(
-                        `🎯 ${message.author.tag} mentioned ${TARGET_USER_ID}`
-                    );
+                    const friendMentioned =
+                        message.mentions.users.has(
+                            FRIEND_USER_ID
+                        );
 
 
-                    for (
-                        const emojiId
-                        of TARGET_REACTION_EMOJIS
-                    ) {
+                    /*
+                     * ------------------------------------------------------------------
+                     * REACT WHEN YOU ARE MENTIONED
+                     * ------------------------------------------------------------------
+                     */
+
+                    if (targetMentioned) {
+
+                        logger.info(
+                            `🎯 ${message.author.tag} mentioned ${TARGET_USER_ID}`
+                        );
+
+
+                        for (
+                            const emojiId
+                            of TARGET_REACTION_EMOJIS
+                        ) {
+
+                            await message
+                                .react(emojiId)
+                                .catch(error => {
+
+                                    logger.error(
+                                        `❌ Failed to react with emoji ${emojiId}:`,
+                                        error
+                                    );
+
+                                });
+                        }
+                    }
+
+
+                    /*
+                     * ------------------------------------------------------------------
+                     * REACT WHEN FRIEND IS MENTIONED
+                     * ------------------------------------------------------------------
+                     */
+
+                    if (friendMentioned) {
+
+                        logger.info(
+                            `💖 ${message.author.tag} mentioned friend ${FRIEND_USER_ID}`
+                        );
+
 
                         await message
-                            .react(emojiId)
+                            .react(FRIEND_REACTION_EMOJI)
                             .catch(error => {
 
                                 logger.error(
-                                    `❌ Failed to react with emoji ${emojiId}:`,
+                                    '❌ Failed to react with friend emoji:',
                                     error
                                 );
 
                             });
                     }
+
                 }
-
-
-                /*
-                 * ----------------------------------------------------------------------
-                 * REACT WHEN FRIEND IS MENTIONED
-                 * ----------------------------------------------------------------------
-                 */
-
-                if (friendMentioned) {
-
-                    logger.info(
-                        `💖 ${message.author.tag} mentioned friend ${FRIEND_USER_ID}`
-                    );
-
-
-                    await message
-                        .react(FRIEND_REACTION_EMOJI)
-                        .catch(error => {
-
-                            logger.error(
-                                '❌ Failed to react with friend emoji:',
-                                error
-                            );
-
-                        });
-                }
-
 
             } catch (error) {
 
@@ -786,7 +812,7 @@ async function handlePrefixCommand(
  * 3
  * 8  <- WRONG
  *
- * The 8 message is deleted.
+ * 8 is deleted.
  *
  * The game continues:
  *
@@ -864,14 +890,14 @@ async function handleCountingGame(
          * CHECK SAME USER
          * ----------------------------------------------------------------------
          *
-         * Same person cannot count twice consecutively.
+         * The same person cannot count twice consecutively.
          *
          * Example:
          *
          * User A: 1
-         * User A: 2  <- deleted
+         * User A: 2 <- deleted
          *
-         * The count remains at 2.
+         * The sequence does NOT reset.
          *
          * ----------------------------------------------------------------------
          */
@@ -883,7 +909,7 @@ async function handleCountingGame(
 
         /*
          * ----------------------------------------------------------------------
-         * WRONG COUNT
+         * WRONG COUNT OR SAME USER
          * ----------------------------------------------------------------------
          */
 
@@ -901,18 +927,14 @@ async function handleCountingGame(
 
 
             /*
-             * IMPORTANT:
-             *
-             * We DO NOT modify:
+             * DO NOT reset:
              *
              * - nextNumber
              * - lastUserId
              * - currentStreak
              *
-             * Therefore the counting sequence stays where
-             * it was before the wrong message.
+             * The current counting position remains unchanged.
              */
-
 
             const expectedNumber =
                 config.nextNumber;
@@ -920,7 +942,7 @@ async function handleCountingGame(
 
             /*
              * ------------------------------------------------------------------
-             * WARNING
+             * SEND TEMPORARY WARNING
              * ------------------------------------------------------------------
              */
 
@@ -952,8 +974,7 @@ async function handleCountingGame(
 
 
             /*
-             * Stop this message from being treated
-             * as a normal bot command.
+             * Counting message handled.
              */
 
             return true;
