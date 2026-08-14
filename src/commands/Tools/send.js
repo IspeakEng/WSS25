@@ -29,11 +29,11 @@ export default {
         // Wait 1.5 seconds
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Send the message
-        await interaction.channel.send(message);
+        // Send the message and save the message object
+        const sentMessage = await interaction.channel.send(message);
 
         await interaction.reply({
-            content: '✅ Message sent.',
+            content: `✅ Message sent.\n\n**Message ID:** \`${sentMessage.id}\``,
             ephemeral: true
         });
     }
