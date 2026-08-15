@@ -60,7 +60,7 @@ const TARGET_USER_ID = '1054967242497982476';
 
 // Your custom emoji ID
 const TARGET_REACTION_EMOJIS = [
-    '1528022603770630185',
+    '💗',
 ];
 
 
