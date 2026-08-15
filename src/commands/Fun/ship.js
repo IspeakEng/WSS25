@@ -1,4 +1,6 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, AttachmentBuilder } from 'discord.js';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+
 import { createEmbed } from '../../utils/embeds.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 import { replyUserError, ErrorTypes } from '../../utils/errorHandler.js';
@@ -73,9 +75,7 @@ function createSeed(user1Id, user2Id) {
 }
 
 function getCompatibility(user1Id, user2Id) {
-  const seed = createSeed(user1Id, user2Id);
-
-  return seed % 101;
+  return createSeed(user1Id, user2Id) % 101;
 }
 
 function getStatus(score) {
@@ -104,43 +104,324 @@ function getRandomItems(array, count, seed) {
 
 function getVerdict(score) {
   if (score >= 85) {
-    return getRandomItems(
-      VERDICTS.soulmate,
-      1,
-      score * 37,
-    )[0];
+    return getRandomItems(VERDICTS.soulmate, 1, score * 37)[0];
   }
 
   if (score >= 55) {
-    return getRandomItems(
-      VERDICTS.good,
-      1,
-      score * 53,
-    )[0];
+    return getRandomItems(VERDICTS.good, 1, score * 53)[0];
   }
 
   if (score >= 30) {
-    return getRandomItems(
-      VERDICTS.neutral,
-      1,
-      score * 71,
-    )[0];
+    return getRandomItems(VERDICTS.neutral, 1, score * 71)[0];
   }
 
-  return getRandomItems(
-    VERDICTS.bad,
-    1,
-    score * 97,
-  )[0];
+  return getRandomItems(VERDICTS.bad, 1, score * 97)[0];
 }
 
-function createShipBar(score) {
-  const length = 15;
+function drawRoundedRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
+  ctx.closePath();
+}
 
-  const filled = Math.round((score / 100) * length);
-  const empty = length - filled;
+function drawCircularImage(ctx, image, x, y, size) {
+  ctx.save();
 
-  return `♡ ${'━'.repeat(filled)}●${'━'.repeat(empty)} ♡`;
+  ctx.beginPath();
+  ctx.arc(
+    x + size / 2,
+    y + size / 2,
+    size / 2,
+    0,
+    Math.PI * 2,
+  );
+  ctx.closePath();
+  ctx.clip();
+
+  ctx.drawImage(image, x, y, size, size);
+
+  ctx.restore();
+}
+
+function drawAvatarBorder(ctx, x, y, size) {
+  ctx.save();
+
+  ctx.beginPath();
+  ctx.arc(
+    x + size / 2,
+    y + size / 2,
+    size / 2 + 6,
+    0,
+    Math.PI * 2,
+  );
+
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawCenteredText(ctx, text, x, y, font, color) {
+  ctx.font = font;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+}
+
+async function createShipCard(user1, user2, score, status) {
+  const width = 1200;
+  const height = 700;
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  const background = ctx.createLinearGradient(
+    0,
+    0,
+    width,
+    height,
+  );
+
+  background.addColorStop(0, '#17121f');
+  background.addColorStop(0.5, '#24172d');
+  background.addColorStop(1, '#12121a');
+
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, width, height);
+
+  // Decorative circles
+  ctx.globalAlpha = 0.08;
+
+  ctx.fillStyle = '#ffffff';
+
+  ctx.beginPath();
+  ctx.arc(100, 100, 180, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.arc(1100, 600, 220, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = 1;
+
+  // Header
+  drawCenteredText(
+    ctx,
+    'SHIP COMPATIBILITY',
+    width / 2,
+    65,
+    'bold 34px sans-serif',
+    '#ffffff',
+  );
+
+  drawCenteredText(
+    ctx,
+    'how compatible are they?',
+    width / 2,
+    105,
+    '22px sans-serif',
+    '#b9adbf',
+  );
+
+  // Avatar settings
+  const avatarSize = 230;
+
+  const user1X = 180;
+  const user2X = width - 180 - avatarSize;
+  const avatarY = 155;
+
+  // Avatar cards
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+
+  drawRoundedRect(
+    ctx,
+    user1X - 20,
+    avatarY - 20,
+    avatarSize + 40,
+    avatarSize + 40,
+    28,
+  );
+
+  ctx.fill();
+
+  drawRoundedRect(
+    ctx,
+    user2X - 20,
+    avatarY - 20,
+    avatarSize + 40,
+    avatarSize + 40,
+    28,
+  );
+
+  ctx.fill();
+
+  // Load avatars
+  const avatar1 = await loadImage(
+    user1.displayAvatarURL({
+      extension: 'png',
+      size: 256,
+    }),
+  );
+
+  const avatar2 = await loadImage(
+    user2.displayAvatarURL({
+      extension: 'png',
+      size: 256,
+    }),
+  );
+
+  // Draw avatars
+  drawCircularImage(
+    ctx,
+    avatar1,
+    user1X,
+    avatarY,
+    avatarSize,
+  );
+
+  drawCircularImage(
+    ctx,
+    avatar2,
+    user2X,
+    avatarY,
+    avatarSize,
+  );
+
+  drawAvatarBorder(
+    ctx,
+    user1X,
+    avatarY,
+    avatarSize,
+  );
+
+  drawAvatarBorder(
+    ctx,
+    user2X,
+    avatarY,
+    avatarSize,
+  );
+
+  // X symbol
+  drawCenteredText(
+    ctx,
+    '×',
+    width / 2,
+    avatarY + avatarSize / 2,
+    'bold 62px sans-serif',
+    '#ffffff',
+  );
+
+  // Usernames
+  const username1 =
+    user1.username.length > 18
+      ? `${user1.username.slice(0, 16)}...`
+      : user1.username;
+
+  const username2 =
+    user2.username.length > 18
+      ? `${user2.username.slice(0, 16)}...`
+      : user2.username;
+
+  drawCenteredText(
+    ctx,
+    username1,
+    user1X + avatarSize / 2,
+    425,
+    'bold 27px sans-serif',
+    '#ffffff',
+  );
+
+  drawCenteredText(
+    ctx,
+    username2,
+    user2X + avatarSize / 2,
+    425,
+    'bold 27px sans-serif',
+    '#ffffff',
+  );
+
+  // Score
+  drawCenteredText(
+    ctx,
+    `${score}%`,
+    width / 2,
+    445,
+    'bold 68px sans-serif',
+    '#ffffff',
+  );
+
+  // Status
+  drawCenteredText(
+    ctx,
+    status.name,
+    width / 2,
+    505,
+    'bold 25px sans-serif',
+    '#d6bfdc',
+  );
+
+  // Progress bar
+  const barWidth = 600;
+  const barHeight = 18;
+
+  const barX = (width - barWidth) / 2;
+  const barY = 550;
+
+  drawRoundedRect(
+    ctx,
+    barX,
+    barY,
+    barWidth,
+    barHeight,
+    10,
+  );
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.fill();
+
+  const filledWidth = Math.max(
+    0,
+    (barWidth * score) / 100,
+  );
+
+  if (filledWidth > 0) {
+    drawRoundedRect(
+      ctx,
+      barX,
+      barY,
+      filledWidth,
+      barHeight,
+      10,
+    );
+
+    const progressGradient = ctx.createLinearGradient(
+      barX,
+      barY,
+      barX + barWidth,
+      barY,
+    );
+
+    progressGradient.addColorStop(0, '#c9a7d8');
+    progressGradient.addColorStop(1, '#ffffff');
+
+    ctx.fillStyle = progressGradient;
+    ctx.fill();
+  }
+
+  // Bottom decorative text
+  drawCenteredText(
+    ctx,
+    '♡',
+    width / 2,
+    620,
+    '30px sans-serif',
+    '#ffffff',
+  );
+
+  return canvas.encode('png');
 }
 
 export default {
@@ -191,7 +472,8 @@ export default {
       if (user1.bot || user2.bot) {
         return await replyUserError(interaction, {
           type: ErrorTypes.VALIDATION,
-          message: 'Bots cannot be shipped. They have no romantic subroutines.',
+          message:
+            'Bots cannot be shipped. They have no romantic subroutines.',
         });
       }
 
@@ -203,10 +485,17 @@ export default {
         });
       }
 
-      const score = getCompatibility(user1.id, user2.id);
+      const score = getCompatibility(
+        user1.id,
+        user2.id,
+      );
+
       const status = getStatus(score);
 
-      const seed = createSeed(user1.id, user2.id);
+      const seed = createSeed(
+        user1.id,
+        user2.id,
+      );
 
       const reasons = getRandomItems(
         REASONS,
@@ -215,47 +504,50 @@ export default {
       );
 
       const verdict = getVerdict(score);
-      const shipBar = createShipBar(score);
+
+      const shipCard = await createShipCard(
+        user1,
+        user2,
+        score,
+        status,
+      );
+
+      const attachment = new AttachmentBuilder(
+        shipCard,
+        {
+          name: 'ship-card.png',
+        },
+      );
 
       const description = [
         `**${user1.username}**  ×  **${user2.username}**`,
         '',
-        `### ${score}%`,
-        shipBar,
-        '',
-        `**${status.name}**`,
+        `**Compatibility:** \`${score}%\``,
         '',
         '**Compatibility Analysis**',
-        reasons.map((reason) => `> ${reason}`).join('\n'),
+        reasons
+          .map((reason) => `> ${reason}`)
+          .join('\n'),
         '',
         `*${verdict}*`,
       ].join('\n');
 
-      return await InteractionHelper.safeEditReply(interaction, {
-        embeds: [
-          createEmbed({
-            title: 'SHIP COMPATIBILITY',
-            description,
+      return await InteractionHelper.safeEditReply(
+        interaction,
+        {
+          files: [attachment],
 
-            color: 'primary',
-
-            author: {
-              name: user1.username,
-              icon: user1.displayAvatarURL({
-                size: 128,
-                extension: 'png',
-              }),
-            },
-
-            thumbnail: user2.displayAvatarURL({
-              size: 256,
-              extension: 'png',
+          embeds: [
+            createEmbed({
+              title: 'SHIP COMPATIBILITY',
+              description,
+              color: 'primary',
+              image: 'attachment://ship-card.png',
+              footer: `Shipped by ${interaction.user.username}`,
             }),
-
-            footer: `Shipped by ${interaction.user.username}`,
-          }),
-        ],
-      });
+          ],
+        },
+      );
     } catch (error) {
       logger.error('Ship command error:', error);
 
