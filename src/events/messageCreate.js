@@ -43,7 +43,6 @@ import {
 
 import {
     getCountingGameConfig,
-    saveCountingGameConfig,
     isValidCountingMessage,
     recordCorrectCount,
 } from '../services/countingGameService.js';
@@ -251,8 +250,6 @@ export default {
              * AUTO MENTION REACTIONS
              * ==========================================================================
              *
-             * IMPORTANT:
-             *
              * Reactions ONLY happen on normal messages.
              *
              * If the message is a REPLY, reactions are skipped.
@@ -369,6 +366,16 @@ export default {
              * ==========================================================================
              * BAD WORD FILTER
              * ==========================================================================
+             *
+             * BAD WORD MESSAGE:
+             *
+             * 1. Message is detected.
+             * 2. Message is deleted.
+             * 3. No public warning is sent.
+             * 4. No DM is sent.
+             * 5. No other message systems continue processing it.
+             *
+             * ==========================================================================
              */
 
             const badWords = [
@@ -400,29 +407,31 @@ export default {
 
                 try {
 
-                    await message.delete();
+                    /*
+                     * ------------------------------------------------------------------
+                     * DELETE BAD WORD MESSAGE ONLY
+                     * ------------------------------------------------------------------
+                     */
 
-                    const warning =
-                        await message.channel.send({
-                            content:
-                                `⚠️ ${message.author}, please keep the chat clean.`,
-                        });
-
-                    setTimeout(() => {
-
-                        warning
-                            .delete()
-                            .catch(() => {});
-
-                    }, 5000);
+                    await message.delete()
+                        .catch(() => {});
 
                 } catch (error) {
 
                     logger.error(
-                        'Failed to handle bad word message:',
+                        'Failed to delete bad word message:',
                         error
                     );
                 }
+
+                /*
+                 * Stop processing this message.
+                 *
+                 * This prevents:
+                 * - counting
+                 * - prefix commands
+                 * - other message processing
+                 */
 
                 return;
             }
