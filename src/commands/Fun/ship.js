@@ -9,7 +9,7 @@ const SHIP_STATUSES = [
   { min: 85, name: 'ABSOLUTELY DESTINED' },
   { min: 70, name: 'POWER COUPLE' },
   { min: 55, name: 'SUSPICIOUSLY CLOSE' },
-  { min: 40, name: 'IT\'S COMPLICATED' },
+  { min: 40, name: "IT'S COMPLICATED" },
   { min: 25, name: 'JUST FRIENDS' },
   { min: 10, name: 'BARELY COMPATIBLE' },
   { min: 0, name: 'ABSOLUTE DISASTER' },
@@ -39,16 +39,19 @@ const VERDICTS = {
     'Someone needs to start planning the wedding.',
     'Even the server can see the chemistry.',
   ],
+
   good: [
     'There is definitely something going on here.',
     'This duo might actually work.',
     'The potential is dangerously high.',
   ],
+
   neutral: [
     'Could work. Could also end terribly.',
     'The algorithm is confused but slightly optimistic.',
     'There is potential... somewhere.',
   ],
+
   bad: [
     'Maybe keep these two away from each other.',
     'The algorithm recommends staying friends.',
@@ -131,17 +134,28 @@ function getVerdict(score) {
   )[0];
 }
 
+function createShipBar(score) {
+  const length = 15;
+
+  const filled = Math.round((score / 100) * length);
+  const empty = length - filled;
+
+  return `♡ ${'━'.repeat(filled)}●${'━'.repeat(empty)} ♡`;
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('ship')
     .setDescription('See how compatible two users are')
     .setDMPermission(false)
+
     .addUserOption((option) =>
       option
         .setName('user1')
         .setDescription('The first person')
         .setRequired(true),
     )
+
     .addUserOption((option) =>
       option
         .setName('user2')
@@ -160,6 +174,7 @@ export default {
           userId: interaction.user.id,
           guildId: interaction.guildId,
         });
+
         return;
       }
 
@@ -183,7 +198,8 @@ export default {
       if (user1.id === user2.id) {
         return await replyUserError(interaction, {
           type: ErrorTypes.VALIDATION,
-          message: 'You cannot ship someone with themselves. Even the algorithm has limits.',
+          message:
+            'You cannot ship someone with themselves. Even the algorithm has limits.',
         });
       }
 
@@ -199,32 +215,43 @@ export default {
       );
 
       const verdict = getVerdict(score);
-
-      const progressFilled = Math.round(score / 10);
-      const progressEmpty = 10 - progressFilled;
-
-      const progressBar =
-        `[${'█'.repeat(progressFilled)}${'░'.repeat(progressEmpty)}]`;
+      const shipBar = createShipBar(score);
 
       const description = [
-        `**Compatibility:** \`${score}%\``,
-        `**Status:** ${status.name}`,
+        `**${user1.username}**  ×  **${user2.username}**`,
         '',
-        progressBar,
+        `### ${score}%`,
+        shipBar,
+        '',
+        `**${status.name}**`,
         '',
         '**Compatibility Analysis**',
-        reasons.map((reason) => `> • ${reason}`).join('\n'),
+        reasons.map((reason) => `> ${reason}`).join('\n'),
         '',
-        `**Final Verdict:** ${verdict}`,
+        `*${verdict}*`,
       ].join('\n');
 
       return await InteractionHelper.safeEditReply(interaction, {
         embeds: [
           createEmbed({
-            title: `Ship Report — ${user1.username} × ${user2.username}`,
+            title: 'SHIP COMPATIBILITY',
             description,
+
             color: 'primary',
-            thumbnail: user1.displayAvatarURL({ size: 256 }),
+
+            author: {
+              name: user1.username,
+              icon: user1.displayAvatarURL({
+                size: 128,
+                extension: 'png',
+              }),
+            },
+
+            thumbnail: user2.displayAvatarURL({
+              size: 256,
+              extension: 'png',
+            }),
+
             footer: `Shipped by ${interaction.user.username}`,
           }),
         ],
@@ -234,7 +261,8 @@ export default {
 
       return await replyUserError(interaction, {
         type: ErrorTypes.UNKNOWN,
-        message: 'The ship calculator crashed. The relationship may be too complicated.',
+        message:
+          'The ship calculator crashed. The relationship may be too complicated.',
       });
     }
   },
