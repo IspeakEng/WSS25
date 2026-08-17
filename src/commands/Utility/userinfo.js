@@ -1,5 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { createEmbed } from '../../utils/embeds.js';
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
@@ -30,14 +29,10 @@ export default {
       // USER
       // ─────────────────────────────────────────────
 
-      const user =
-        interaction.options.getUser("target") || interaction.user;
+      const user = interaction.options.getUser("target") || interaction.user;
 
-      // Fetch all guild roles first
-      // This makes sure member role objects are available.
       await interaction.guild.roles.fetch();
 
-      // Force-fetch the actual member
       const member = await interaction.guild.members
         .fetch({
           user: user.id,
@@ -50,12 +45,8 @@ export default {
       // ─────────────────────────────────────────────
 
       const createdDate = new Date(user.createdTimestamp);
+      const createdTimestamp = Math.floor(user.createdTimestamp / 1000);
 
-      const createdTimestamp = Math.floor(
-        user.createdTimestamp / 1000
-      );
-
-      // Bangladesh date
       const bdDate = new Intl.DateTimeFormat("en-GB", {
         timeZone: "Asia/Dhaka",
         day: "2-digit",
@@ -63,7 +54,6 @@ export default {
         year: "numeric",
       }).format(createdDate);
 
-      // Bangladesh time
       const bdTime = new Intl.DateTimeFormat("en-US", {
         timeZone: "Asia/Dhaka",
         hour: "2-digit",
@@ -84,18 +74,16 @@ export default {
         }).format(createdDate)
       );
 
-      let timePeriod;
-      let periodIcon;
-
+      let timePeriod, periodIcon;
       if (bdHour >= 5 && bdHour < 12) {
         timePeriod = "Morning";
-        periodIcon = "☀️";
+        periodIcon = "🌅";
       } else if (bdHour >= 12 && bdHour < 17) {
         timePeriod = "Afternoon";
-        periodIcon = "🌤️";
+        periodIcon = "☀️";
       } else if (bdHour >= 17 && bdHour < 20) {
         timePeriod = "Evening";
-        periodIcon = "🌆";
+        periodIcon = "🌇";
       } else {
         timePeriod = "Night";
         periodIcon = "🌙";
@@ -110,10 +98,102 @@ export default {
         : null;
 
       // ─────────────────────────────────────────────
-      // ROLES
+      // 📊 PROGRESS BAR (মেম্বারশিপ লেভেল)
       // ─────────────────────────────────────────────
 
-      let roleText = "No additional roles";
+      let progressBar = "❌ *Not in server*";
+      let membershipLevel = "";
+
+      if (member) {
+        const now = Date.now();
+        const joinedDate = member.joinedTimestamp;
+        const daysInServer = Math.floor((now - joinedDate) / (1000 * 60 * 60 * 24));
+        
+        // 30 দিনে ১০০% ধরে (১ মাস)
+        const progressPercent = Math.min((daysInServer / 30) * 100, 100);
+        const filledBars = Math.floor(progressPercent / 10);
+        const emptyBars = 10 - filledBars;
+        
+        const filled = '█'.repeat(filledBars);
+        const empty = '░'.repeat(emptyBars);
+        
+        progressBar = `\`${filled}${empty}\` **${Math.round(progressPercent)}%**`;
+        
+        // মেম্বারশিপ লেভেল
+        if (daysInServer < 1) {
+          membershipLevel = "🆕 *Newbie*";
+        } else if (daysInServer < 7) {
+          membershipLevel = "🌱 *Rookie*";
+        } else if (daysInServer < 30) {
+          membershipLevel = "📈 *Regular*";
+        } else if (daysInServer < 90) {
+          membershipLevel = "⭐ *Veteran*";
+        } else if (daysInServer < 365) {
+          membershipLevel = "🔥 *Loyal*";
+        } else {
+          membershipLevel = "👑 *OG (Original Gangster)*";
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // 🟢 STATUS
+      // ─────────────────────────────────────────────
+
+      let statusText = "❌ *Offline / Invisible*";
+      let statusEmoji = "⚫";
+      let statusColor = "#2B2D31"; // ডিফল্ট ডার্ক
+
+      if (member?.presence) {
+        const status = member.presence.status;
+        
+        const statusMap = {
+          online: { 
+            emoji: "🟢", 
+            text: "🟢 Online",
+            color: "#57F287" // ডিসকর্ড গ্রিন
+          },
+          idle: { 
+            emoji: "🟡", 
+            text: "🟡 Idle",
+            color: "#FEE75C" // ডিসকর্ড ইয়েলো
+          },
+          dnd: { 
+            emoji: "🔴", 
+            text: "🔴 Do Not Disturb",
+            color: "#ED4245" // ডিসকর্ড রেড
+          },
+          offline: { 
+            emoji: "⚫", 
+            text: "⚫ Offline",
+            color: "#80848E" // ডিসকর্ড গ্রে
+          }
+        };
+        
+        const statusInfo = statusMap[status] || statusMap.offline;
+        statusEmoji = statusInfo.emoji;
+        statusText = statusInfo.text;
+        statusColor = statusInfo.color;
+        
+        // কাস্টম স্ট্যাটাস (অ্যাক্টিভিটি) থাকলে
+        if (member.presence.activities && member.presence.activities.length > 0) {
+          const activity = member.presence.activities[0];
+          if (activity.name && activity.name !== "Custom Status") {
+            statusText += `\n┃ ✦ **${activity.name}**`;
+            if (activity.details) {
+              statusText += `\n┃   └─ ${activity.details}`;
+            }
+            if (activity.state) {
+              statusText += `\n┃   └─ ${activity.state}`;
+            }
+          }
+        }
+      }
+
+      // ─────────────────────────────────────────────
+      // ROLES (মোবাইলের জন্য অপটিমাইজড)
+      // ─────────────────────────────────────────────
+
+      let roleText = "*No additional roles*";
 
       if (member) {
         const roleIds = [...member.roles.cache.keys()]
@@ -125,13 +205,15 @@ export default {
           .sort((a, b) => b.position - a.position);
 
         if (roles.length > 0) {
+          const maxRoles = 8; // মোবাইলের জন্য
+          
           roleText = roles
-            .slice(0, 20)
+            .slice(0, maxRoles)
             .map((role) => `<@&${role.id}>`)
-            .join("  ");
+            .join(" ");
 
-          if (roles.length > 20) {
-            roleText += `\n> ✦ *+${roles.length - 20} more role(s)*`;
+          if (roles.length > maxRoles) {
+            roleText += `\n┃ ✦ *+${roles.length - maxRoles} more*`;
           }
         }
       }
@@ -140,11 +222,9 @@ export default {
       // HIGHEST ROLE
       // ─────────────────────────────────────────────
 
-      let highestRole = "No additional role";
-
+      let highestRole = "*No additional role*";
       if (member?.roles?.highest) {
         const highest = member.roles.highest;
-
         if (highest.id !== interaction.guild.id) {
           highestRole = highest.toString();
         }
@@ -154,119 +234,61 @@ export default {
       // DISPLAY NAME
       // ─────────────────────────────────────────────
 
-      const displayName =
-        member?.displayName ||
-        user.globalName ||
-        user.username;
+      const displayName = member?.displayName || user.globalName || user.username;
 
       // ─────────────────────────────────────────────
-      // EMBED
+      // 🎨 EMBED — প্রোগ্রেস বার + স্ট্যাটাস + ডায়নামিক কালার
       // ─────────────────────────────────────────────
 
-      const embed = createEmbed({
-        title: "✦・USER INFORMATION・✦",
-
-        description:
-          `╭──────────────────────────────╮\n` +
-          `\u2003\u2003\u2003\u2003\u2003\u2003\u2003\u2003**${displayName}**\n` +
-          `╰──────────────────────────────╯`,
-      })
-
-        // ─────────────────────────────────────────
-        // AVATAR
-        // ─────────────────────────────────────────
-
-        .setThumbnail(
-          user.displayAvatarURL({
-            dynamic: true,
-            size: 512,
-          })
-        )
-
+      const embed = new EmbedBuilder()
+        .setColor(statusColor) // 🔥 স্ট্যাটাস অনুযায়ী কালার!
         .setAuthor({
-          name: user.tag,
-          iconURL: user.displayAvatarURL({
-            dynamic: true,
-            size: 128,
-          }),
+          name: `${user.username} • Profile`,
+          iconURL: user.displayAvatarURL({ dynamic: true, size: 128 }),
         })
-
-        // ─────────────────────────────────────────
-        // IDENTITY
-        // ─────────────────────────────────────────
-
-        .addFields({
-          name: "╭─ ✦ ɪᴅᴇɴᴛɪᴛʏ",
-          value:
-            `> **Username** ── \`${user.username}\`\n` +
-            `> **Display Name** ── ${displayName}\n` +
-            `> **User ID** ── \`${user.id}\``,
-          inline: false,
-        })
-
-        // ─────────────────────────────────────────
-        // SERVER
-        // ─────────────────────────────────────────
-
-        .addFields({
-          name: "╭─ ◈ sᴇʀᴠᴇʀ",
-          value:
-            `> **Joined** ── ${
-              joinedTimestamp
-                ? `<t:${joinedTimestamp}:R>`
-                : "`Not in server`"
-            }\n` +
-            `> **Highest Role** ── ${highestRole}`,
-          inline: true,
-        })
-
-        // ─────────────────────────────────────────
-        // ACCOUNT
-        // ─────────────────────────────────────────
-
-        .addFields({
-          name: "╭─ ⟡ ᴀᴄᴄᴏᴜɴᴛ",
-          value:
-            `> **Bot** ── ${user.bot ? "✦ Yes" : "✦ No"}\n` +
-            `> **Created** ── <t:${createdTimestamp}:R>`,
-          inline: true,
-        })
-
-        // ─────────────────────────────────────────
-        // CREATION TIME
-        // ─────────────────────────────────────────
-
-        .addFields({
-          name: "╭─ ◌ ᴄʀᴇᴀᴛɪᴏɴ ᴛɪᴍᴇ",
-          value:
-            `> **Date** ── ${bdDate}\n` +
-            `> **Time** ── ${bdTime} (BD)\n` +
-            `> **Period** ── ${periodIcon} ${timePeriod}`,
-          inline: false,
-        })
-
-        // ─────────────────────────────────────────
-        // ROLES
-        // ─────────────────────────────────────────
-
-        .addFields({
-          name: "╭─ ✧ ʀᴏʟᴇs",
-          value: `> ${roleText}`,
-          inline: false,
-        })
-
-        // ─────────────────────────────────────────
-        // FOOTER
-        // ─────────────────────────────────────────
-
+        .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 1024 }))
+        .setDescription(
+          `> ✦ **${displayName}** ✦\n` +
+          `> \`${user.id}\`\n` +
+          `\n` +
+          `> ${statusText}\n` +
+          `> ${member ? '📌 **Member**' : '❌ **Not in server**'}`
+        )
+        .addFields(
+          {
+            name: `📅 Account Created`,
+            value: `<t:${createdTimestamp}:D>\n<t:${createdTimestamp}:T> (BD)\n${periodIcon} ${timePeriod}`,
+            inline: true,
+          },
+          {
+            name: `📥 Joined Server`,
+            value: joinedTimestamp 
+              ? `<t:${joinedTimestamp}:D>\n<t:${joinedTimestamp}:R>` 
+              : "*Not in server*",
+            inline: true,
+          },
+          {
+            name: `📊 Membership Level`,
+            value: `${progressBar}\n${membershipLevel}`,
+            inline: true,
+          },
+          {
+            name: `🏆 Highest Role`,
+            value: highestRole,
+            inline: true,
+          },
+          {
+            name: `🎭 Roles (${member?.roles?.cache?.size - 1 || 0})`,
+            value: roleText.length > 1024 
+              ? roleText.substring(0, 1020) + "..." 
+              : roleText,
+            inline: false,
+          }
+        )
         .setFooter({
-          text: `✦ Requested by ${interaction.user.tag}  •  ${interaction.guild.name}`,
-          iconURL: interaction.user.displayAvatarURL({
-            dynamic: true,
-            size: 64,
-          }),
+          text: `✦ Requested by ${interaction.user.displayName} • ${interaction.guild.name}`,
+          iconURL: interaction.user.displayAvatarURL({ dynamic: true, size: 64 }),
         })
-
         .setTimestamp();
 
       // ─────────────────────────────────────────────
@@ -291,8 +313,7 @@ export default {
       });
 
       await InteractionHelper.safeEditReply(interaction, {
-        content:
-          "✦ Something went wrong while fetching this user's information.",
+        content: "✦ Something went wrong while fetching this user's information.",
         embeds: [],
       }).catch(() => {});
     }
