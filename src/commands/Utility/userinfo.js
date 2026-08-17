@@ -31,10 +31,8 @@ export default {
 
       const user = interaction.options.getUser("target") || interaction.user;
 
-      // সব রোল ফেচ করো
       await interaction.guild.roles.fetch();
 
-      // মেম্বার ফেচ করো (force true দিয়ে)
       const member = await interaction.guild.members
         .fetch({
           user: user.id,
@@ -107,7 +105,7 @@ export default {
       const userType = isBot ? "🤖 **Bot**" : "👤 **User**";
 
       // ─────────────────────────────────────────────
-      // 📊 PROGRESS BAR (শুধু মেম্বারদের জন্য)
+      // 📊 PROGRESS BAR
       // ─────────────────────────────────────────────
 
       let progressBar = "❌ *Not in server*";
@@ -143,78 +141,7 @@ export default {
       }
 
       // ─────────────────────────────────────────────
-      // 🟢 STATUS — ফিক্সড ভার্সন
-      // ─────────────────────────────────────────────
-
-      let statusText = "⚫ Offline / Invisible";
-      let statusEmoji = "⚫";
-      let statusColor = "#80848E"; // অফলাইন কালার (গ্রে)
-
-      // মেম্বার থাকলেই স্ট্যাটাস চেক করো
-      if (member) {
-        // প্রেজেন্স ফেচ করার চেষ্টা করো
-        const presence = member.presence;
-        
-        if (presence) {
-          const status = presence.status;
-          
-          // স্ট্যাটাস ম্যাপিং
-          const statusMap = {
-            online: { 
-              emoji: "🟢", 
-              text: "🟢 **Online**",
-              color: "#57F287" 
-            },
-            idle: { 
-              emoji: "🟡", 
-              text: "🟡 **Idle**",
-              color: "#FEE75C" 
-            },
-            dnd: { 
-              emoji: "🔴", 
-              text: "🔴 **Do Not Disturb**",
-              color: "#ED4245" 
-            },
-            offline: { 
-              emoji: "⚫", 
-              text: "⚫ **Offline**",
-              color: "#80848E" 
-            }
-          };
-          
-          const statusInfo = statusMap[status] || statusMap.offline;
-          statusEmoji = statusInfo.emoji;
-          statusText = statusInfo.text;
-          statusColor = statusInfo.color;
-          
-          // 🎮 অ্যাক্টিভিটি দেখাও (গেম, স্পটিফাই, ইত্যাদি)
-          if (presence.activities && presence.activities.length > 0) {
-            const activities = presence.activities
-              .filter(activity => activity.name && activity.name !== "Custom Status")
-              .map(activity => {
-                let details = activity.name;
-                if (activity.details) details += `\n┃   └─ ${activity.details}`;
-                if (activity.state) details += `\n┃   └─ ${activity.state}`;
-                return details;
-              });
-            
-            if (activities.length > 0) {
-              statusText += `\n┃ ✦ ${activities.join('\n┃ ✦ ')}`;
-            }
-          }
-        } else {
-          // প্রেজেন্স না থাকলে অফলাইন
-          statusText = "⚫ **Offline**";
-          statusColor = "#80848E";
-        }
-      } else {
-        // মেম্বার না হলে অফলাইন
-        statusText = "⚫ **Not in server**";
-        statusColor = "#80848E";
-      }
-
-      // ─────────────────────────────────────────────
-      // 🎭 ROLES (মোবাইলের জন্য)
+      // 🎭 ROLES
       // ─────────────────────────────────────────────
 
       let roleText = "*No additional roles*";
@@ -261,11 +188,11 @@ export default {
       const displayName = member?.displayName || user.globalName || user.username;
 
       // ─────────────────────────────────────────────
-      // 🎨 EMBED
+      // 🎨 EMBED — স্ট্যাটাস বাদে
       // ─────────────────────────────────────────────
 
       const embed = new EmbedBuilder()
-        .setColor(statusColor)
+        .setColor("#2B2D31") // ডিফল্ট ডার্ক কালার
         .setAuthor({
           name: `${user.username} • Profile`,
           iconURL: user.displayAvatarURL({ dynamic: true, size: 128 }),
@@ -275,7 +202,6 @@ export default {
           `> ✦ **${displayName}** ✦\n` +
           `> \`${user.id}\`\n` +
           `\n` +
-          `> ${statusText}\n` +
           `> ${userType} ${member ? '• 📌 **Member**' : '• ❌ **Not in server**'}`
         )
         .addFields(
