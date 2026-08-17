@@ -26,13 +26,15 @@ export default {
 
     try {
       // ─────────────────────────────────────────────
-      // USER
+      // USER & MEMBER
       // ─────────────────────────────────────────────
 
       const user = interaction.options.getUser("target") || interaction.user;
 
+      // সব রোল ফেচ করো
       await interaction.guild.roles.fetch();
 
+      // মেম্বার ফেচ করো (force true দিয়ে)
       const member = await interaction.guild.members
         .fetch({
           user: user.id,
@@ -41,7 +43,7 @@ export default {
         .catch(() => null);
 
       // ─────────────────────────────────────────────
-      // ACCOUNT CREATION
+      // 📅 ACCOUNT CREATION
       // ─────────────────────────────────────────────
 
       const createdDate = new Date(user.createdTimestamp);
@@ -63,7 +65,7 @@ export default {
       }).format(createdDate);
 
       // ─────────────────────────────────────────────
-      // TIME PERIOD
+      // 🌅 TIME PERIOD
       // ─────────────────────────────────────────────
 
       const bdHour = Number(
@@ -90,7 +92,7 @@ export default {
       }
 
       // ─────────────────────────────────────────────
-      // SERVER JOIN DATE
+      // 📥 SERVER JOIN DATE
       // ─────────────────────────────────────────────
 
       const joinedTimestamp = member?.joinedTimestamp
@@ -98,7 +100,14 @@ export default {
         : null;
 
       // ─────────────────────────────────────────────
-      // 📊 PROGRESS BAR (মেম্বারশিপ লেভেল)
+      // 🤖 BOT DETECTION
+      // ─────────────────────────────────────────────
+
+      const isBot = user.bot;
+      const userType = isBot ? "🤖 **Bot**" : "👤 **User**";
+
+      // ─────────────────────────────────────────────
+      // 📊 PROGRESS BAR (শুধু মেম্বারদের জন্য)
       // ─────────────────────────────────────────────
 
       let progressBar = "❌ *Not in server*";
@@ -109,7 +118,6 @@ export default {
         const joinedDate = member.joinedTimestamp;
         const daysInServer = Math.floor((now - joinedDate) / (1000 * 60 * 60 * 24));
         
-        // 30 দিনে ১০০% ধরে (১ মাস)
         const progressPercent = Math.min((daysInServer / 30) * 100, 100);
         const filledBars = Math.floor(progressPercent / 10);
         const emptyBars = 10 - filledBars;
@@ -119,7 +127,6 @@ export default {
         
         progressBar = `\`${filled}${empty}\` **${Math.round(progressPercent)}%**`;
         
-        // মেম্বারশিপ লেভেল
         if (daysInServer < 1) {
           membershipLevel = "🆕 *Newbie*";
         } else if (daysInServer < 7) {
@@ -131,66 +138,83 @@ export default {
         } else if (daysInServer < 365) {
           membershipLevel = "🔥 *Loyal*";
         } else {
-          membershipLevel = "👑 *OG (Original Gangster)*";
+          membershipLevel = "👑 *OG*";
         }
       }
 
       // ─────────────────────────────────────────────
-      // 🟢 STATUS
+      // 🟢 STATUS — ফিক্সড ভার্সন
       // ─────────────────────────────────────────────
 
-      let statusText = "❌ *Offline / Invisible*";
+      let statusText = "⚫ Offline / Invisible";
       let statusEmoji = "⚫";
-      let statusColor = "#2B2D31"; // ডিফল্ট ডার্ক
+      let statusColor = "#80848E"; // অফলাইন কালার (গ্রে)
 
-      if (member?.presence) {
-        const status = member.presence.status;
+      // মেম্বার থাকলেই স্ট্যাটাস চেক করো
+      if (member) {
+        // প্রেজেন্স ফেচ করার চেষ্টা করো
+        const presence = member.presence;
         
-        const statusMap = {
-          online: { 
-            emoji: "🟢", 
-            text: "🟢 Online",
-            color: "#57F287" // ডিসকর্ড গ্রিন
-          },
-          idle: { 
-            emoji: "🟡", 
-            text: "🟡 Idle",
-            color: "#FEE75C" // ডিসকর্ড ইয়েলো
-          },
-          dnd: { 
-            emoji: "🔴", 
-            text: "🔴 Do Not Disturb",
-            color: "#ED4245" // ডিসকর্ড রেড
-          },
-          offline: { 
-            emoji: "⚫", 
-            text: "⚫ Offline",
-            color: "#80848E" // ডিসকর্ড গ্রে
-          }
-        };
-        
-        const statusInfo = statusMap[status] || statusMap.offline;
-        statusEmoji = statusInfo.emoji;
-        statusText = statusInfo.text;
-        statusColor = statusInfo.color;
-        
-        // কাস্টম স্ট্যাটাস (অ্যাক্টিভিটি) থাকলে
-        if (member.presence.activities && member.presence.activities.length > 0) {
-          const activity = member.presence.activities[0];
-          if (activity.name && activity.name !== "Custom Status") {
-            statusText += `\n┃ ✦ **${activity.name}**`;
-            if (activity.details) {
-              statusText += `\n┃   └─ ${activity.details}`;
+        if (presence) {
+          const status = presence.status;
+          
+          // স্ট্যাটাস ম্যাপিং
+          const statusMap = {
+            online: { 
+              emoji: "🟢", 
+              text: "🟢 **Online**",
+              color: "#57F287" 
+            },
+            idle: { 
+              emoji: "🟡", 
+              text: "🟡 **Idle**",
+              color: "#FEE75C" 
+            },
+            dnd: { 
+              emoji: "🔴", 
+              text: "🔴 **Do Not Disturb**",
+              color: "#ED4245" 
+            },
+            offline: { 
+              emoji: "⚫", 
+              text: "⚫ **Offline**",
+              color: "#80848E" 
             }
-            if (activity.state) {
-              statusText += `\n┃   └─ ${activity.state}`;
+          };
+          
+          const statusInfo = statusMap[status] || statusMap.offline;
+          statusEmoji = statusInfo.emoji;
+          statusText = statusInfo.text;
+          statusColor = statusInfo.color;
+          
+          // 🎮 অ্যাক্টিভিটি দেখাও (গেম, স্পটিফাই, ইত্যাদি)
+          if (presence.activities && presence.activities.length > 0) {
+            const activities = presence.activities
+              .filter(activity => activity.name && activity.name !== "Custom Status")
+              .map(activity => {
+                let details = activity.name;
+                if (activity.details) details += `\n┃   └─ ${activity.details}`;
+                if (activity.state) details += `\n┃   └─ ${activity.state}`;
+                return details;
+              });
+            
+            if (activities.length > 0) {
+              statusText += `\n┃ ✦ ${activities.join('\n┃ ✦ ')}`;
             }
           }
+        } else {
+          // প্রেজেন্স না থাকলে অফলাইন
+          statusText = "⚫ **Offline**";
+          statusColor = "#80848E";
         }
+      } else {
+        // মেম্বার না হলে অফলাইন
+        statusText = "⚫ **Not in server**";
+        statusColor = "#80848E";
       }
 
       // ─────────────────────────────────────────────
-      // ROLES (মোবাইলের জন্য অপটিমাইজড)
+      // 🎭 ROLES (মোবাইলের জন্য)
       // ─────────────────────────────────────────────
 
       let roleText = "*No additional roles*";
@@ -205,7 +229,7 @@ export default {
           .sort((a, b) => b.position - a.position);
 
         if (roles.length > 0) {
-          const maxRoles = 8; // মোবাইলের জন্য
+          const maxRoles = 8;
           
           roleText = roles
             .slice(0, maxRoles)
@@ -219,7 +243,7 @@ export default {
       }
 
       // ─────────────────────────────────────────────
-      // HIGHEST ROLE
+      // 🏆 HIGHEST ROLE
       // ─────────────────────────────────────────────
 
       let highestRole = "*No additional role*";
@@ -231,17 +255,17 @@ export default {
       }
 
       // ─────────────────────────────────────────────
-      // DISPLAY NAME
+      // 📛 DISPLAY NAME
       // ─────────────────────────────────────────────
 
       const displayName = member?.displayName || user.globalName || user.username;
 
       // ─────────────────────────────────────────────
-      // 🎨 EMBED — প্রোগ্রেস বার + স্ট্যাটাস + ডায়নামিক কালার
+      // 🎨 EMBED
       // ─────────────────────────────────────────────
 
       const embed = new EmbedBuilder()
-        .setColor(statusColor) // 🔥 স্ট্যাটাস অনুযায়ী কালার!
+        .setColor(statusColor)
         .setAuthor({
           name: `${user.username} • Profile`,
           iconURL: user.displayAvatarURL({ dynamic: true, size: 128 }),
@@ -252,7 +276,7 @@ export default {
           `> \`${user.id}\`\n` +
           `\n` +
           `> ${statusText}\n` +
-          `> ${member ? '📌 **Member**' : '❌ **Not in server**'}`
+          `> ${userType} ${member ? '• 📌 **Member**' : '• ❌ **Not in server**'}`
         )
         .addFields(
           {
@@ -269,7 +293,7 @@ export default {
           },
           {
             name: `📊 Membership Level`,
-            value: `${progressBar}\n${membershipLevel}`,
+            value: member ? `${progressBar}\n${membershipLevel}` : "*Not a member*",
             inline: true,
           },
           {
