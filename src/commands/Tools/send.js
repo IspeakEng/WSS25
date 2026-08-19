@@ -3,6 +3,8 @@ import {
     AttachmentBuilder
 } from 'discord.js';
 
+const OWNER_ID = '1054967242497982476';
+
 export default {
     data: new SlashCommandBuilder()
         .setName('send')
@@ -10,15 +12,29 @@ export default {
 
         .addStringOption(option =>
             option
+                .setName('server_id')
+                .setDescription('Target server ID')
+                .setRequired(true)
+        )
+
+        .addStringOption(option =>
+            option
+                .setName('channel_id')
+                .setDescription('Target channel ID')
+                .setRequired(true)
+        )
+
+        .addStringOption(option =>
+            option
                 .setName('message')
-                .setDescription('The message you want the bot to send')
+                .setDescription('The message you want to send')
                 .setRequired(false)
         )
 
         .addAttachmentOption(option =>
             option
                 .setName('file')
-                .setDescription('Image, GIF, video, or other file to send')
+                .setDescription('Image, GIF, video, or other file')
                 .setRequired(false)
         )
 
@@ -31,24 +47,11 @@ export default {
 
     async execute(interaction) {
         try {
-            // Command must be used inside a server
-            if (!interaction.guild) {
-                return interaction.reply({
-                    content: '❌ This command can only be used inside a server.',
-                    ephemeral: true
-                });
-            }
+            const serverId =
+                interaction.options.getString('server_id');
 
-            // =========================
-            // SERVER OWNER CHECK
-            // =========================
-            if (interaction.user.id !== interaction.guild.ownerId) {
-                return interaction.reply({
-                    content:
-                        '❌ Only this server\'s owner can use the `/send` command.',
-                    ephemeral: true
-                });
-            }
+            const channelId =
+                interaction.options.getString('channel_id');
 
             const message =
                 interaction.options.getString('message');
@@ -59,7 +62,9 @@ export default {
             const stickerId =
                 interaction.options.getString('sticker_id');
 
-            // Nothing provided
+            // =========================
+            // CHECK CONTENT
+            // =========================
             if (!message && !file && !stickerId) {
                 return interaction.reply({
                     content:
@@ -68,31 +73,123 @@ export default {
                 });
             }
 
-            // Defer response
+            // =========================
+            // FIND TARGET SERVER
+            // =========================
+            const targetGuild =
+                interaction.client.guilds.cache.get(serverId);
+
+            if (!targetGuild) {
+                return interaction.reply({
+                    content:
+                        '❌ I am not in that server, or the Server ID is incorrect.',
+                    ephemeral: true
+                });
+            }
+
+            // =========================
+            // PERMISSION CHECK
+            // =========================
+            const isBotOwner =
+                interaction.user.id === OWNER_ID;
+
+            const isTargetServerOwner =
+                interaction.user.id === targetGuild.ownerId;
+
+            /*
+             * Bot owner:
+             * Can send to every server where the bot exists.
+             *
+             * Server owner:
+             * Can only send to their own server.
+             *
+             * Everyone else:
+             * Not allowed.
+             */
+            if (!isBotOwner && !isTargetServerOwner) {
+                return interaction.reply({
+                    content:
+                        '❌ You are not allowed to send messages to this server.',
+                    ephemeral: true
+                });
+            }
+
+            // =========================
+            // FIND TARGET CHANNEL
+            // =========================
+            const targetChannel =
+                await targetGuild.channels.fetch(channelId);
+
+            if (!targetChannel) {
+                return interaction.reply({
+                    content:
+                        '❌ Channel not found in that server.',
+                    ephemeral: true
+                });
+            }
+
+            // Make sure channel can receive messages
+            if (!targetChannel.isTextBased()) {
+                return interaction.reply({
+                    content:
+                        '❌ That channel cannot receive messages.',
+                    ephemeral: true
+                });
+            }
+
+            // =========================
+            // CHECK BOT PERMISSIONS
+            // =========================
+            const botMember =
+                await targetGuild.members.fetchMe();
+
+            const permissions =
+                targetChannel.permissionsFor(botMember);
+
+            if (!permissions?.has('SendMessages')) {
+                return interaction.reply({
+                    content:
+                        '❌ I do not have **Send Messages** permission in that channel.',
+                    ephemeral: true
+                });
+            }
+
+            if (file && !permissions?.has('AttachFiles')) {
+                return interaction.reply({
+                    content:
+                        '❌ I do not have **Attach Files** permission in that channel.',
+                    ephemeral: true
+                });
+            }
+
+            // =========================
+            // DEFER
+            // =========================
             await interaction.deferReply({
                 ephemeral: true
             });
 
-            // Typing indicator
-            await interaction.channel.sendTyping();
+            // =========================
+            // TYPING
+            // =========================
+            await targetChannel.sendTyping();
 
             // Small delay
             await new Promise(resolve =>
                 setTimeout(resolve, 1500)
             );
 
+            // =========================
+            // CREATE PAYLOAD
+            // =========================
             const payload = {};
 
-            // =========================
-            // TEXT
-            // =========================
+            // Text
             if (message) {
                 payload.content = message;
             }
 
-            // =========================
-            // IMAGE / GIF / VIDEO / FILE
-            // =========================
+            // Image / GIF / Video / File
             if (file) {
                 payload.files = [
                     new AttachmentBuilder(file.url, {
@@ -101,9 +198,7 @@ export default {
                 ];
             }
 
-            // =========================
-            // STICKER
-            // =========================
+            // Sticker
             if (stickerId) {
                 payload.stickers = [stickerId];
             }
@@ -112,13 +207,16 @@ export default {
             // SEND
             // =========================
             const sentMessage =
-                await interaction.channel.send(payload);
+                await targetChannel.send(payload);
 
+            // =========================
+            // SUCCESS
+            // =========================
             await interaction.editReply({
                 content:
-                    `✅ Message sent successfully.\n\n` +
-                    `**Server:** ${interaction.guild.name}\n` +
-                    `**Channel:** ${interaction.channel}\n` +
+                    `✅ **Message sent successfully!**\n\n` +
+                    `**Server:** ${targetGuild.name}\n` +
+                    `**Channel:** ${targetChannel}\n` +
                     `**Message ID:** \`${sentMessage.id}\``
             });
 
@@ -126,7 +224,7 @@ export default {
             console.error('Send command error:', error);
 
             const errorMessage =
-                '❌ Failed to send the message. Make sure the bot has permission to send messages and attach files in this channel.';
+                '❌ Failed to send the message. Check the Server ID, Channel ID, and bot permissions.';
 
             if (interaction.deferred || interaction.replied) {
                 await interaction.editReply({
