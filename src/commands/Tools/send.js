@@ -10,20 +10,23 @@ export default {
         .setName('send')
         .setDescription('Send a message through the bot')
 
+        // Optional target server
         .addStringOption(option =>
             option
                 .setName('server_id')
-                .setDescription('Target server ID')
-                .setRequired(true)
+                .setDescription('Target server ID (leave empty for current server)')
+                .setRequired(false)
         )
 
+        // Optional target channel
         .addStringOption(option =>
             option
                 .setName('channel_id')
-                .setDescription('Target channel ID')
-                .setRequired(true)
+                .setDescription('Target channel ID (leave empty for current channel)')
+                .setRequired(false)
         )
 
+        // Message
         .addStringOption(option =>
             option
                 .setName('message')
@@ -31,6 +34,7 @@ export default {
                 .setRequired(false)
         )
 
+        // File
         .addAttachmentOption(option =>
             option
                 .setName('file')
@@ -38,6 +42,7 @@ export default {
                 .setRequired(false)
         )
 
+        // Sticker
         .addStringOption(option =>
             option
                 .setName('sticker_id')
@@ -62,9 +67,10 @@ export default {
             const stickerId =
                 interaction.options.getString('sticker_id');
 
-            // =========================
-            // CHECK CONTENT
-            // =========================
+            // ==========================================
+            // CHECK MESSAGE / FILE / STICKER
+            // ==========================================
+
             if (!message && !file && !stickerId) {
                 return interaction.reply({
                     content:
@@ -73,23 +79,41 @@ export default {
                 });
             }
 
-            // =========================
-            // FIND TARGET SERVER
-            // =========================
-            const targetGuild =
-                interaction.client.guilds.cache.get(serverId);
+            // ==========================================
+            // DETERMINE TARGET SERVER
+            // ==========================================
 
-            if (!targetGuild) {
-                return interaction.reply({
-                    content:
-                        '❌ I am not in that server, or the Server ID is incorrect.',
-                    ephemeral: true
-                });
+            let targetGuild;
+
+            if (serverId) {
+                // Specific server requested
+                targetGuild =
+                    interaction.client.guilds.cache.get(serverId);
+
+                if (!targetGuild) {
+                    return interaction.reply({
+                        content:
+                            '❌ I am not in that server, or the Server ID is incorrect.',
+                        ephemeral: true
+                    });
+                }
+            } else {
+                // No server ID = current server
+                if (!interaction.guild) {
+                    return interaction.reply({
+                        content:
+                            '❌ You must provide a server_id when using this command in DMs.',
+                        ephemeral: true
+                    });
+                }
+
+                targetGuild = interaction.guild;
             }
 
-            // =========================
+            // ==========================================
             // PERMISSION CHECK
-            // =========================
+            // ==========================================
+
             const isBotOwner =
                 interaction.user.id === OWNER_ID;
 
@@ -98,37 +122,67 @@ export default {
 
             /*
              * Bot owner:
-             * Can send to every server where the bot exists.
+             * Can send to every server where bot exists.
              *
              * Server owner:
-             * Can only send to their own server.
-             *
-             * Everyone else:
-             * Not allowed.
+             * Can send only to their own server.
              */
+
             if (!isBotOwner && !isTargetServerOwner) {
                 return interaction.reply({
                     content:
-                        '❌ You are not allowed to send messages to this server.',
+                        '❌ Only the bot owner or this server\'s owner can use this command.',
                     ephemeral: true
                 });
             }
 
-            // =========================
-            // FIND TARGET CHANNEL
-            // =========================
-            const targetChannel =
-                await targetGuild.channels.fetch(channelId);
+            // ==========================================
+            // DETERMINE TARGET CHANNEL
+            // ==========================================
 
-            if (!targetChannel) {
-                return interaction.reply({
-                    content:
-                        '❌ Channel not found in that server.',
-                    ephemeral: true
-                });
+            let targetChannel;
+
+            if (channelId) {
+                // Specific channel requested
+                targetChannel =
+                    await targetGuild.channels.fetch(channelId);
+
+                if (!targetChannel) {
+                    return interaction.reply({
+                        content:
+                            '❌ Channel not found in that server.',
+                        ephemeral: true
+                    });
+                }
+            } else {
+                // No channel ID = current channel
+                if (!interaction.channel) {
+                    return interaction.reply({
+                        content:
+                            '❌ Could not determine the current channel.',
+                        ephemeral: true
+                    });
+                }
+
+                // Make sure current channel belongs to target server
+                if (
+                    !interaction.guild ||
+                    interaction.guild.id !== targetGuild.id
+                ) {
+                    return interaction.reply({
+                        content:
+                            '❌ When sending to another server, you must provide a channel_id.',
+                        ephemeral: true
+                    });
+                }
+
+                targetChannel = interaction.channel;
             }
 
-            // Make sure channel can receive messages
+            // ==========================================
+            // CHECK TEXT CHANNEL
+            // ==========================================
+
             if (!targetChannel.isTextBased()) {
                 return interaction.reply({
                     content:
@@ -137,9 +191,10 @@ export default {
                 });
             }
 
-            // =========================
+            // ==========================================
             // CHECK BOT PERMISSIONS
-            // =========================
+            // ==========================================
+
             const botMember =
                 await targetGuild.members.fetchMe();
 
@@ -162,16 +217,18 @@ export default {
                 });
             }
 
-            // =========================
+            // ==========================================
             // DEFER
-            // =========================
+            // ==========================================
+
             await interaction.deferReply({
                 ephemeral: true
             });
 
-            // =========================
+            // ==========================================
             // TYPING
-            // =========================
+            // ==========================================
+
             await targetChannel.sendTyping();
 
             // Small delay
@@ -179,9 +236,10 @@ export default {
                 setTimeout(resolve, 1500)
             );
 
-            // =========================
+            // ==========================================
             // CREATE PAYLOAD
-            // =========================
+            // ==========================================
+
             const payload = {};
 
             // Text
@@ -203,15 +261,17 @@ export default {
                 payload.stickers = [stickerId];
             }
 
-            // =========================
-            // SEND
-            // =========================
+            // ==========================================
+            // SEND MESSAGE
+            // ==========================================
+
             const sentMessage =
                 await targetChannel.send(payload);
 
-            // =========================
+            // ==========================================
             // SUCCESS
-            // =========================
+            // ==========================================
+
             await interaction.editReply({
                 content:
                     `✅ **Message sent successfully!**\n\n` +
