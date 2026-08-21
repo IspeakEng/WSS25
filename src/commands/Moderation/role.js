@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
+  EmbedBuilder,
 } from 'discord.js';
 
 export default {
@@ -49,55 +50,164 @@ export default {
     const role = interaction.options.getRole('role');
 
     const member = await interaction.guild.members.fetch(user.id);
-
-    // Bot-এর নিজের highest role
     const botMember = interaction.guild.members.me;
 
-    // @everyone role
     if (role.id === interaction.guild.id) {
+      const embed = new EmbedBuilder()
+        .setColor(0x000000)
+        .setTitle('❌ Role Error')
+        .setDescription('You cannot give or remove the `@everyone` role.')
+        .setTimestamp();
+
       return interaction.reply({
-        content: '❌ You cannot give/remove the @everyone role.',
+        embeds: [embed],
         ephemeral: true,
       });
     }
 
-    // Bot role hierarchy check
     if (role.position >= botMember.roles.highest.position) {
+      const embed = new EmbedBuilder()
+        .setColor(0x000000)
+        .setTitle('❌ Role Hierarchy Error')
+        .setDescription(
+          `I cannot manage **${role.name}** because this role is higher than or equal to my highest role.`
+        )
+        .setTimestamp();
+
       return interaction.reply({
-        content: `❌ I can't manage **${role.name}** because this role is higher than or equal to my highest role.`,
+        embeds: [embed],
         ephemeral: true,
       });
     }
 
-    // Check if user already has the role
     if (subcommand === 'give') {
       if (member.roles.cache.has(role.id)) {
+        const embed = new EmbedBuilder()
+          .setColor(0x000000)
+          .setTitle('⚠️ Role Already Assigned')
+          .setDescription(
+            `<@${user.id}> already has the **${role.name}** role.`
+          )
+          .setTimestamp();
+
         return interaction.reply({
-          content: `⚠️ <@${user.id}> already has **${role.name}**.`,
+          embeds: [embed],
           ephemeral: true,
         });
       }
 
-      await member.roles.add(role);
+      try {
+        await member.roles.add(role);
 
-      return interaction.reply({
-        content: `✅ Gave **${role.name}** to <@${user.id}>.`,
-      });
+        const embed = new EmbedBuilder()
+          .setColor(0x000000)
+          .setTitle('Role Given')
+          .setDescription(
+            `Successfully gave **${role.name}** to <@${user.id}>.`
+          )
+          .addFields(
+            {
+              name: 'Member',
+              value: `<@${user.id}>`,
+              inline: true,
+            },
+            {
+              name: 'Role',
+              value: `<@&${role.id}>`,
+              inline: true,
+            },
+            {
+              name: 'Moderator',
+              value: `<@${interaction.user.id}>`,
+              inline: true,
+            }
+          )
+          .setTimestamp();
+
+        return interaction.reply({
+          embeds: [embed],
+        });
+      } catch (error) {
+        console.error(error);
+
+        const embed = new EmbedBuilder()
+          .setColor(0x000000)
+          .setTitle('❌ Failed to Give Role')
+          .setDescription(
+            'I could not give this role. Please check my **Manage Roles** permission and role hierarchy.'
+          )
+          .setTimestamp();
+
+        return interaction.reply({
+          embeds: [embed],
+          ephemeral: true,
+        });
+      }
     }
 
     if (subcommand === 'remove') {
       if (!member.roles.cache.has(role.id)) {
+        const embed = new EmbedBuilder()
+          .setColor(0x000000)
+          .setTitle('⚠️ Role Not Found')
+          .setDescription(
+            `<@${user.id}> does not have the **${role.name}** role.`
+          )
+          .setTimestamp();
+
         return interaction.reply({
-          content: `⚠️ <@${user.id}> doesn't have **${role.name}**.`,
+          embeds: [embed],
           ephemeral: true,
         });
       }
 
-      await member.roles.remove(role);
+      try {
+        await member.roles.remove(role);
 
-      return interaction.reply({
-        content: `✅ Removed **${role.name}** from <@${user.id}>.`,
-      });
+        const embed = new EmbedBuilder()
+          .setColor(0x000000)
+          .setTitle('Role Removed')
+          .setDescription(
+            `Successfully removed **${role.name}** from <@${user.id}>.`
+          )
+          .addFields(
+            {
+              name: 'Member',
+              value: `<@${user.id}>`,
+              inline: true,
+            },
+            {
+              name: 'Role',
+              value: `<@&${role.id}>`,
+              inline: true,
+            },
+            {
+              name: 'Moderator',
+              value: `<@${interaction.user.id}>`,
+              inline: true,
+            }
+          )
+          .setTimestamp();
+
+        return interaction.reply({
+          embeds: [embed],
+        });
+      } catch (error) {
+        console.error(error);
+
+        const embed = new EmbedBuilder()
+          .setColor(0x000000)
+          .setTitle('❌ Failed to Remove Role')
+          .setDescription(
+            'I could not remove this role. Please check my **Manage Roles** permission and role hierarchy.'
+          )
+          .setTimestamp();
+
+        return interaction.reply({
+          embeds: [embed],
+          ephemeral: true,
+        });
+      }
     }
   },
 };
