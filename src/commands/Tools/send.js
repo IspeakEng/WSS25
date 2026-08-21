@@ -1,6 +1,7 @@
 import {
     SlashCommandBuilder,
-    AttachmentBuilder
+    AttachmentBuilder,
+    EmbedBuilder
 } from 'discord.js';
 
 const OWNER_ID = '1054967242497982476';
@@ -8,9 +9,12 @@ const OWNER_ID = '1054967242497982476';
 export default {
     data: new SlashCommandBuilder()
         .setName('send')
-        .setDescription('Send a message through the bot')
+        .setDescription('Send a message or embed through the bot')
 
-        // Optional target server
+        // ==========================================
+        // TARGET SERVER
+        // ==========================================
+
         .addStringOption(option =>
             option
                 .setName('server_id')
@@ -18,7 +22,10 @@ export default {
                 .setRequired(false)
         )
 
-        // Optional target channel
+        // ==========================================
+        // TARGET CHANNEL
+        // ==========================================
+
         .addStringOption(option =>
             option
                 .setName('channel_id')
@@ -26,23 +33,98 @@ export default {
                 .setRequired(false)
         )
 
-        // Message
+        // ==========================================
+        // NORMAL MESSAGE
+        // ==========================================
+
         .addStringOption(option =>
             option
                 .setName('message')
-                .setDescription('The message you want to send')
+                .setDescription('Normal message to send')
                 .setRequired(false)
         )
 
-        // File
+        // ==========================================
+        // EMBED TITLE
+        // ==========================================
+
+        .addStringOption(option =>
+            option
+                .setName('title')
+                .setDescription('Embed title')
+                .setRequired(false)
+        )
+
+        // ==========================================
+        // EMBED DESCRIPTION
+        // ==========================================
+
+        .addStringOption(option =>
+            option
+                .setName('description')
+                .setDescription('Embed description')
+                .setRequired(false)
+        )
+
+        // ==========================================
+        // EMBED IMAGE URL
+        // ==========================================
+
+        .addStringOption(option =>
+            option
+                .setName('image')
+                .setDescription('Image or GIF URL for the embed')
+                .setRequired(false)
+        )
+
+        // ==========================================
+        // EMBED THUMBNAIL
+        // ==========================================
+
+        .addStringOption(option =>
+            option
+                .setName('thumbnail')
+                .setDescription('Thumbnail image URL')
+                .setRequired(false)
+        )
+
+        // ==========================================
+        // EMBED COLOR
+        // ==========================================
+
+        .addStringOption(option =>
+            option
+                .setName('color')
+                .setDescription('Embed color, example: #000000')
+                .setRequired(false)
+        )
+
+        // ==========================================
+        // EMBED FOOTER
+        // ==========================================
+
+        .addStringOption(option =>
+            option
+                .setName('footer')
+                .setDescription('Embed footer text')
+                .setRequired(false)
+        )
+
+        // ==========================================
+        // FILE UPLOAD
+        // ==========================================
+
         .addAttachmentOption(option =>
             option
                 .setName('file')
-                .setDescription('Image, GIF, video, or other file')
+                .setDescription('Upload an image, GIF, video, or other file')
                 .setRequired(false)
         )
 
-        // Sticker
+        // ==========================================
+        // STICKER
+        // ==========================================
+
         .addStringOption(option =>
             option
                 .setName('sticker_id')
@@ -52,6 +134,11 @@ export default {
 
     async execute(interaction) {
         try {
+
+            // ==========================================
+            // GET OPTIONS
+            // ==========================================
+
             const serverId =
                 interaction.options.getString('server_id');
 
@@ -61,23 +148,52 @@ export default {
             const message =
                 interaction.options.getString('message');
 
+            const title =
+                interaction.options.getString('title');
+
+            const description =
+                interaction.options.getString('description');
+
+            const image =
+                interaction.options.getString('image');
+
+            const thumbnail =
+                interaction.options.getString('thumbnail');
+
+            const color =
+                interaction.options.getString('color');
+
+            const footer =
+                interaction.options.getString('footer');
+
             const file =
                 interaction.options.getAttachment('file');
 
             const stickerId =
                 interaction.options.getString('sticker_id');
 
+
             // ==========================================
-            // CHECK MESSAGE / FILE / STICKER
+            // CHECK IF SOMETHING WAS PROVIDED
             // ==========================================
 
-            if (!message && !file && !stickerId) {
+            if (
+                !message &&
+                !title &&
+                !description &&
+                !image &&
+                !thumbnail &&
+                !footer &&
+                !file &&
+                !stickerId
+            ) {
                 return interaction.reply({
                     content:
-                        '❌ Give me a message, file, or sticker.',
+                        '❌ Give me a message, embed content, file, or sticker.',
                     ephemeral: true
                 });
             }
+
 
             // ==========================================
             // DETERMINE TARGET SERVER
@@ -86,7 +202,7 @@ export default {
             let targetGuild;
 
             if (serverId) {
-                // Specific server requested
+
                 targetGuild =
                     interaction.client.guilds.cache.get(serverId);
 
@@ -97,8 +213,9 @@ export default {
                         ephemeral: true
                     });
                 }
+
             } else {
-                // No server ID = current server
+
                 if (!interaction.guild) {
                     return interaction.reply({
                         content:
@@ -110,6 +227,7 @@ export default {
                 targetGuild = interaction.guild;
             }
 
+
             // ==========================================
             // PERMISSION CHECK
             // ==========================================
@@ -120,14 +238,6 @@ export default {
             const isTargetServerOwner =
                 interaction.user.id === targetGuild.ownerId;
 
-            /*
-             * Bot owner:
-             * Can send to every server where bot exists.
-             *
-             * Server owner:
-             * Can send only to their own server.
-             */
-
             if (!isBotOwner && !isTargetServerOwner) {
                 return interaction.reply({
                     content:
@@ -136,6 +246,7 @@ export default {
                 });
             }
 
+
             // ==========================================
             // DETERMINE TARGET CHANNEL
             // ==========================================
@@ -143,7 +254,7 @@ export default {
             let targetChannel;
 
             if (channelId) {
-                // Specific channel requested
+
                 targetChannel =
                     await targetGuild.channels.fetch(channelId);
 
@@ -154,8 +265,9 @@ export default {
                         ephemeral: true
                     });
                 }
+
             } else {
-                // No channel ID = current channel
+
                 if (!interaction.channel) {
                     return interaction.reply({
                         content:
@@ -164,7 +276,6 @@ export default {
                     });
                 }
 
-                // Make sure current channel belongs to target server
                 if (
                     !interaction.guild ||
                     interaction.guild.id !== targetGuild.id
@@ -179,6 +290,7 @@ export default {
                 targetChannel = interaction.channel;
             }
 
+
             // ==========================================
             // CHECK TEXT CHANNEL
             // ==========================================
@@ -190,6 +302,7 @@ export default {
                     ephemeral: true
                 });
             }
+
 
             // ==========================================
             // CHECK BOT PERMISSIONS
@@ -217,6 +330,7 @@ export default {
                 });
             }
 
+
             // ==========================================
             // DEFER
             // ==========================================
@@ -225,16 +339,17 @@ export default {
                 ephemeral: true
             });
 
+
             // ==========================================
             // TYPING
             // ==========================================
 
             await targetChannel.sendTyping();
 
-            // Small delay
             await new Promise(resolve =>
-                setTimeout(resolve, 1500)
+                setTimeout(resolve, 1000)
             );
+
 
             // ==========================================
             // CREATE PAYLOAD
@@ -242,31 +357,140 @@ export default {
 
             const payload = {};
 
-            // Text
+
+            // ==========================================
+            // NORMAL MESSAGE
+            // ==========================================
+
             if (message) {
                 payload.content = message;
             }
 
-            // Image / GIF / Video / File
+
+            // ==========================================
+            // CREATE EMBED
+            // ==========================================
+
+            if (
+                title ||
+                description ||
+                image ||
+                thumbnail ||
+                footer ||
+                color
+            ) {
+
+                const embed =
+                    new EmbedBuilder();
+
+                // Title
+                if (title) {
+                    embed.setTitle(title);
+                }
+
+                // Description
+                if (description) {
+                    embed.setDescription(description);
+                }
+
+                // Image / GIF
+                if (image) {
+                    embed.setImage(image);
+                }
+
+                // Thumbnail
+                if (thumbnail) {
+                    embed.setThumbnail(thumbnail);
+                }
+
+                // Footer
+                if (footer) {
+                    embed.setFooter({
+                        text: footer
+                    });
+                }
+
+                // Color
+                if (color) {
+
+                    const cleanColor =
+                        color.replace('#', '');
+
+                    if (/^[0-9A-Fa-f]{6}$/.test(cleanColor)) {
+
+                        embed.setColor(
+                            `#${cleanColor}`
+                        );
+
+                    } else {
+
+                        return interaction.editReply({
+                            content:
+                                '❌ Invalid color. Use a HEX color like `#000000`.'
+                        });
+                    }
+                }
+
+                payload.embeds = [embed];
+            }
+
+
+            // ==========================================
+            // FILE
+            // ==========================================
+
             if (file) {
+
                 payload.files = [
                     new AttachmentBuilder(file.url, {
                         name: file.name
                     })
                 ];
+
+                // If uploaded file is an image/GIF,
+                // automatically display it inside embed
+                if (
+                    file.contentType?.startsWith('image/') &&
+                    !image
+                ) {
+
+                    if (!payload.embeds) {
+
+                        const embed =
+                            new EmbedBuilder();
+
+                        embed.setImage(
+                            `attachment://${file.name}`
+                        );
+
+                        payload.embeds = [embed];
+
+                    } else {
+
+                        payload.embeds[0].setImage(
+                            `attachment://${file.name}`
+                        );
+                    }
+                }
             }
 
-            // Sticker
+
+            // ==========================================
+            // STICKER
+            // ==========================================
+
             if (stickerId) {
                 payload.stickers = [stickerId];
             }
 
+
             // ==========================================
-            // SEND MESSAGE
+            // SEND
             // ==========================================
 
             const sentMessage =
                 await targetChannel.send(payload);
+
 
             // ==========================================
             // SUCCESS
@@ -281,16 +505,26 @@ export default {
             });
 
         } catch (error) {
-            console.error('Send command error:', error);
+
+            console.error(
+                'Send command error:',
+                error
+            );
 
             const errorMessage =
-                '❌ Failed to send the message. Check the Server ID, Channel ID, and bot permissions.';
+                '❌ Failed to send the message. Check the Server ID, Channel ID, image URL, and bot permissions.';
 
-            if (interaction.deferred || interaction.replied) {
+            if (
+                interaction.deferred ||
+                interaction.replied
+            ) {
+
                 await interaction.editReply({
                     content: errorMessage
                 }).catch(() => {});
+
             } else {
+
                 await interaction.reply({
                     content: errorMessage,
                     ephemeral: true
