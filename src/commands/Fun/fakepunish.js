@@ -1,19 +1,18 @@
-import {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  PermissionFlagsBits,
-} from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('fakepunish')
     .setDescription('Show a fake punishment for a member')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+
     .addUserOption(option =>
       option
         .setName('user')
         .setDescription('The member to fake-punish')
         .setRequired(true)
     )
+
     .addStringOption(option =>
       option
         .setName('type')
@@ -27,12 +26,14 @@ export default {
           { name: 'Warn', value: 'warn' }
         )
     )
+
     .addStringOption(option =>
       option
         .setName('reason')
         .setDescription('Reason for the fake punishment')
         .setRequired(false)
     )
+
     .addStringOption(option =>
       option
         .setName('duration')
@@ -41,6 +42,14 @@ export default {
     ),
 
   async execute(interaction) {
+    // 🔐 ADMIN ONLY CHECK
+    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+      return interaction.reply({
+        content: '❌ You need Administrator permission to use this command.',
+        ephemeral: true,
+      });
+    }
+
     const user = interaction.options.getUser('user');
     const type = interaction.options.getString('type');
     const reason =
@@ -71,7 +80,7 @@ export default {
       .addFields(
         {
           name: 'User',
-          value: `${user} \`(${user.id})\``,
+          value: `${user} \`${user.id}\``,
           inline: false,
         },
         {
