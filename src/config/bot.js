@@ -23,9 +23,9 @@ export const botConfig = {
     // 5 = Competing
     activities: [
       {
-        name: "Bland Four", // required by Discord API, not shown in the client
-        state: "Capcom",     // this is what people actually see
-        type: 3,
+        name: "hi", // required by Discord API, not shown in the client
+        state: "corny ahh status in big 2026 🧑🏿‍❤️‍💋‍🧑🏻",     // this is what people actually see
+        type: 4,
       },
     ],
   },
