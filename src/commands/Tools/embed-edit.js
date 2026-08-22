@@ -27,7 +27,6 @@ export default {
         ),
 
     async execute(interaction) {
-        // Owner only
         if (interaction.user.id !== OWNER_ID) {
             return interaction.reply({
                 content: '❌ Only the bot owner can use this command.',
@@ -41,7 +40,6 @@ export default {
         try {
             let targetChannel;
 
-            // Determine channel
             if (channelId) {
                 targetChannel = await interaction.client.channels.fetch(channelId);
                 if (!targetChannel?.isTextBased()) {
@@ -60,10 +58,8 @@ export default {
                 targetChannel = interaction.channel;
             }
 
-            // Fetch the message
             const message = await targetChannel.messages.fetch(messageId);
             
-            // Check if bot owns it
             if (message.author.id !== interaction.client.user.id) {
                 return interaction.reply({
                     content: '❌ I can only edit messages sent by me.',
@@ -71,7 +67,6 @@ export default {
                 });
             }
 
-            // Check if message has embed
             if (!message.embeds.length) {
                 return interaction.reply({
                     content: '❌ This message does not contain an embed.',
@@ -79,7 +74,6 @@ export default {
                 });
             }
 
-            // Get current embed data
             const currentEmbed = message.embeds[0];
             const currentTitle = currentEmbed.title || '';
             const currentDescription = currentEmbed.description || '';
@@ -87,13 +81,12 @@ export default {
                 `#${currentEmbed.color.toString(16).padStart(6, '0')}` : '';
             const currentImage = currentEmbed.image?.url || '';
             const currentThumbnail = currentEmbed.thumbnail?.url || '';
+            const currentFooter = currentEmbed.footer?.text || '';
 
-            // Create modal
             const modal = new ModalBuilder()
                 .setCustomId(`embed_edit:${message.id}:${targetChannel.id}`)
                 .setTitle('Edit Embed');
 
-            // Title input
             const titleInput = new TextInputBuilder()
                 .setCustomId('title')
                 .setLabel('Title')
@@ -101,7 +94,6 @@ export default {
                 .setValue(currentTitle)
                 .setRequired(false);
 
-            // Description input
             const descriptionInput = new TextInputBuilder()
                 .setCustomId('description')
                 .setLabel('Description')
@@ -109,7 +101,6 @@ export default {
                 .setValue(currentDescription)
                 .setRequired(false);
 
-            // Color input
             const colorInput = new TextInputBuilder()
                 .setCustomId('color')
                 .setLabel('Color (e.g., #ff0000)')
@@ -117,7 +108,6 @@ export default {
                 .setValue(currentColor)
                 .setRequired(false);
 
-            // Image URL input
             const imageInput = new TextInputBuilder()
                 .setCustomId('image')
                 .setLabel('Image URL')
@@ -125,7 +115,6 @@ export default {
                 .setValue(currentImage)
                 .setRequired(false);
 
-            // Thumbnail input
             const thumbnailInput = new TextInputBuilder()
                 .setCustomId('thumbnail')
                 .setLabel('Thumbnail URL')
@@ -133,16 +122,23 @@ export default {
                 .setValue(currentThumbnail)
                 .setRequired(false);
 
-            // Add inputs to modal
+            // 👇 NEW: Footer input
+            const footerInput = new TextInputBuilder()
+                .setCustomId('footer')
+                .setLabel('Footer Text')
+                .setStyle(TextInputStyle.Short)
+                .setValue(currentFooter)
+                .setRequired(false);
+
             const row1 = new ActionRowBuilder().addComponents(titleInput);
             const row2 = new ActionRowBuilder().addComponents(descriptionInput);
             const row3 = new ActionRowBuilder().addComponents(colorInput);
             const row4 = new ActionRowBuilder().addComponents(imageInput);
             const row5 = new ActionRowBuilder().addComponents(thumbnailInput);
+            const row6 = new ActionRowBuilder().addComponents(footerInput); // 👈 NEW row
 
-            modal.addComponents(row1, row2, row3, row4, row5);
+            modal.addComponents(row1, row2, row3, row4, row5, row6);
 
-            // Show modal
             await interaction.showModal(modal);
 
         } catch (error) {
