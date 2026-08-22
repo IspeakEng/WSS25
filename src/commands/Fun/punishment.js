@@ -2,21 +2,21 @@ import { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } from 'discord.
 
 export default {
   data: new SlashCommandBuilder()
-    .setName('fakepunish')
+    .setName('punishment')
     .setDescription('Show a fake punishment for a member')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 
     .addUserOption(option =>
       option
         .setName('user')
-        .setDescription('The member to fake-punish')
+        .setDescription('The member to punish')
         .setRequired(true)
     )
 
     .addStringOption(option =>
       option
         .setName('type')
-        .setDescription('Fake punishment type')
+        .setDescription('Punishment type')
         .setRequired(true)
         .addChoices(
           { name: 'Ban', value: 'ban' },
@@ -30,7 +30,7 @@ export default {
     .addStringOption(option =>
       option
         .setName('reason')
-        .setDescription('Reason for the fake punishment')
+        .setDescription('Reason for the punishment')
         .setRequired(false)
     )
 
