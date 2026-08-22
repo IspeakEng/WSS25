@@ -83,10 +83,12 @@ export default {
             const currentThumbnail = currentEmbed.thumbnail?.url || '';
             const currentFooter = currentEmbed.footer?.text || '';
 
+            // Create modal
             const modal = new ModalBuilder()
                 .setCustomId(`embed_edit:${message.id}:${targetChannel.id}`)
                 .setTitle('Edit Embed');
 
+            // Title input
             const titleInput = new TextInputBuilder()
                 .setCustomId('title')
                 .setLabel('Title')
@@ -94,6 +96,7 @@ export default {
                 .setValue(currentTitle)
                 .setRequired(false);
 
+            // Description input
             const descriptionInput = new TextInputBuilder()
                 .setCustomId('description')
                 .setLabel('Description')
@@ -101,6 +104,7 @@ export default {
                 .setValue(currentDescription)
                 .setRequired(false);
 
+            // Color input
             const colorInput = new TextInputBuilder()
                 .setCustomId('color')
                 .setLabel('Color (e.g., #ff0000)')
@@ -108,6 +112,7 @@ export default {
                 .setValue(currentColor)
                 .setRequired(false);
 
+            // Image URL input
             const imageInput = new TextInputBuilder()
                 .setCustomId('image')
                 .setLabel('Image URL')
@@ -115,6 +120,7 @@ export default {
                 .setValue(currentImage)
                 .setRequired(false);
 
+            // Thumbnail input
             const thumbnailInput = new TextInputBuilder()
                 .setCustomId('thumbnail')
                 .setLabel('Thumbnail URL')
@@ -122,7 +128,7 @@ export default {
                 .setValue(currentThumbnail)
                 .setRequired(false);
 
-            // 👇 NEW: Footer input
+            // Footer input
             const footerInput = new TextInputBuilder()
                 .setCustomId('footer')
                 .setLabel('Footer Text')
@@ -130,14 +136,13 @@ export default {
                 .setValue(currentFooter)
                 .setRequired(false);
 
+            // 👇 ৪টা Row (max 5 allowed)
             const row1 = new ActionRowBuilder().addComponents(titleInput);
             const row2 = new ActionRowBuilder().addComponents(descriptionInput);
-            const row3 = new ActionRowBuilder().addComponents(colorInput);
-            const row4 = new ActionRowBuilder().addComponents(imageInput);
-            const row5 = new ActionRowBuilder().addComponents(thumbnailInput);
-            const row6 = new ActionRowBuilder().addComponents(footerInput); // 👈 NEW row
+            const row3 = new ActionRowBuilder().addComponents(colorInput, footerInput);
+            const row4 = new ActionRowBuilder().addComponents(imageInput, thumbnailInput);
 
-            modal.addComponents(row1, row2, row3, row4, row5, row6);
+            modal.addComponents(row1, row2, row3, row4);
 
             await interaction.showModal(modal);
 
