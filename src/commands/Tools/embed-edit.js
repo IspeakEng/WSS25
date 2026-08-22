@@ -1,4 +1,4 @@
-// commands/embed-edit.js
+// src/commands/Tools/embed-edit.js
 import {
     SlashCommandBuilder,
     ModalBuilder,
@@ -6,6 +6,7 @@ import {
     TextInputStyle,
     ActionRowBuilder
 } from 'discord.js';
+import embedEditModal from '../../handlers/interactionHandlers/embedEditModal.js';
 
 const OWNER_ID = '1054967242497982476';
 
@@ -27,6 +28,12 @@ export default {
         ),
 
     async execute(interaction) {
+        // Register modal handler
+        if (!interaction.client.modals.has('embed_edit')) {
+            interaction.client.modals.set('embed_edit', embedEditModal);
+            console.log('✅ Registered embed_edit modal handler');
+        }
+
         // Owner check
         if (interaction.user.id !== OWNER_ID) {
             return interaction.reply({
