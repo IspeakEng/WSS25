@@ -1,10 +1,10 @@
+// commands/embed-edit.js
 import {
     SlashCommandBuilder,
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    ActionRowBuilder,
-    EmbedBuilder
+    ActionRowBuilder
 } from 'discord.js';
 
 const OWNER_ID = '1054967242497982476';
@@ -12,252 +12,153 @@ const OWNER_ID = '1054967242497982476';
 export default {
     data: new SlashCommandBuilder()
         .setName('embed-edit')
-        .setDescription('Open the embed editor for a bot message')
-
-        // ==========================================
-        // MESSAGE ID
-        // ==========================================
-
+        .setDescription('Edit an embed in a message')
         .addStringOption(option =>
             option
                 .setName('message_id')
-                .setDescription('The ID of the embed message')
+                .setDescription('The ID of the message containing the embed')
                 .setRequired(true)
         )
-
-        // ==========================================
-        // CHANNEL ID
-        // ==========================================
-
         .addStringOption(option =>
             option
                 .setName('channel_id')
-                .setDescription('Channel where the message is located')
+                .setDescription('Channel ID (leave empty for current channel)')
                 .setRequired(false)
         ),
 
     async execute(interaction) {
-
-        // ==========================================
-        // OWNER CHECK
-        // ==========================================
-
+        // Owner only
         if (interaction.user.id !== OWNER_ID) {
             return interaction.reply({
-                content: '❌ You are not allowed to use this command.',
+                content: '❌ Only the bot owner can use this command.',
                 ephemeral: true
             });
         }
 
-        const messageId =
-            interaction.options.getString('message_id');
-
-        const channelId =
-            interaction.options.getString('channel_id');
+        const messageId = interaction.options.getString('message_id');
+        const channelId = interaction.options.getString('channel_id');
 
         try {
-
-            // ==========================================
-            // FIND CHANNEL
-            // ==========================================
-
             let targetChannel;
 
+            // Determine channel
             if (channelId) {
-                targetChannel =
-                    await interaction.client.channels.fetch(channelId);
+                targetChannel = await interaction.client.channels.fetch(channelId);
+                if (!targetChannel?.isTextBased()) {
+                    return interaction.reply({
+                        content: '❌ Invalid channel ID.',
+                        ephemeral: true
+                    });
+                }
             } else {
-                targetChannel =
-                    interaction.channel;
+                if (!interaction.channel) {
+                    return interaction.reply({
+                        content: '❌ No channel found.',
+                        ephemeral: true
+                    });
+                }
+                targetChannel = interaction.channel;
             }
 
-            if (!targetChannel?.isTextBased()) {
+            // Fetch the message
+            const message = await targetChannel.messages.fetch(messageId);
+            
+            // Check if bot owns it
+            if (message.author.id !== interaction.client.user.id) {
                 return interaction.reply({
-                    content:
-                        '❌ I could not find a valid text channel.',
+                    content: '❌ I can only edit messages sent by me.',
                     ephemeral: true
                 });
             }
 
-            // ==========================================
-            // FETCH MESSAGE
-            // ==========================================
-
-            const message =
-                await targetChannel.messages.fetch(messageId);
-
-            // ==========================================
-            // BOT MESSAGE CHECK
-            // ==========================================
-
-            if (
-                message.author.id !==
-                interaction.client.user.id
-            ) {
-                return interaction.reply({
-                    content:
-                        '❌ I can only edit messages sent by me.',
-                    ephemeral: true
-                });
-            }
-
-            // ==========================================
-            // CHECK EMBED
-            // ==========================================
-
+            // Check if message has embed
             if (!message.embeds.length) {
                 return interaction.reply({
-                    content:
-                        '❌ This message does not contain an embed.',
+                    content: '❌ This message does not contain an embed.',
                     ephemeral: true
                 });
             }
 
-            const oldEmbed = message.embeds[0];
+            // Get current embed data (for pre-filling the modal)
+            const currentEmbed = message.embeds[0];
+            const currentTitle = currentEmbed.title || '';
+            const currentDescription = currentEmbed.description || '';
+            const currentColor = currentEmbed.color ? 
+                `#${currentEmbed.color.toString(16).padStart(6, '0')}` : '';
+            const currentImage = currentEmbed.image?.url || '';
+            const currentThumbnail = currentEmbed.thumbnail?.url || '';
 
-            // ==========================================
-            // CREATE MODAL
-            // ==========================================
-
+            // Create modal
             const modal = new ModalBuilder()
-                .setCustomId(
-                    `embed_edit:${message.id}:${targetChannel.id}`
-                )
+                .setCustomId(`embed_edit:${message.id}:${targetChannel.id}`)
                 .setTitle('Edit Embed');
 
-            // ==========================================
-            // TITLE
-            // ==========================================
-
+            // Title input
             const titleInput = new TextInputBuilder()
                 .setCustomId('title')
-                .setLabel('Embed Title')
+                .setLabel('Title')
                 .setStyle(TextInputStyle.Short)
-                .setRequired(false)
-                .setMaxLength(256)
-                .setPlaceholder(
-                    oldEmbed.title || 'Enter embed title'
-                )
-                .setValue(
-                    oldEmbed.title || ''
-                );
+                .setValue(currentTitle)
+                .setRequired(false);
 
-            // ==========================================
-            // DESCRIPTION
-            // ==========================================
-
+            // Description input
             const descriptionInput = new TextInputBuilder()
                 .setCustomId('description')
-                .setLabel('Embed Description')
+                .setLabel('Description')
                 .setStyle(TextInputStyle.Paragraph)
-                .setRequired(false)
-                .setMaxLength(4000)
-                .setPlaceholder(
-                    'Enter your embed description'
-                )
-                .setValue(
-                    oldEmbed.description || ''
-                );
+                .setValue(currentDescription)
+                .setRequired(false);
 
-            // ==========================================
-            // COLOR
-            // ==========================================
-
-            let currentColor = '';
-
-            if (oldEmbed.color !== null) {
-                currentColor =
-                    `#${oldEmbed.color
-                        .toString(16)
-                        .padStart(6, '0')}`;
-            }
-
+            // Color input
             const colorInput = new TextInputBuilder()
                 .setCustomId('color')
-                .setLabel('Embed Color')
+                .setLabel('Color (e.g., #ff0000)')
                 .setStyle(TextInputStyle.Short)
-                .setRequired(false)
-                .setMaxLength(7)
-                .setPlaceholder('#000000')
-                .setValue(currentColor);
+                .setValue(currentColor)
+                .setRequired(false);
 
-            // ==========================================
-            // IMAGE
-            // ==========================================
-
+            // Image URL input
             const imageInput = new TextInputBuilder()
                 .setCustomId('image')
-                .setLabel('Image / GIF URL')
+                .setLabel('Image URL')
                 .setStyle(TextInputStyle.Short)
-                .setRequired(false)
-                .setPlaceholder(
-                    oldEmbed.image?.url ||
-                    'https://example.com/image.gif'
-                )
-                .setValue(
-                    oldEmbed.image?.url || ''
-                );
+                .setValue(currentImage)
+                .setRequired(false);
 
-            // ==========================================
-            // THUMBNAIL
-            // ==========================================
-
+            // Thumbnail input
             const thumbnailInput = new TextInputBuilder()
                 .setCustomId('thumbnail')
                 .setLabel('Thumbnail URL')
                 .setStyle(TextInputStyle.Short)
-                .setRequired(false)
-                .setPlaceholder(
-                    oldEmbed.thumbnail?.url ||
-                    'https://example.com/thumbnail.png'
-                )
-                .setValue(
-                    oldEmbed.thumbnail?.url || ''
-                );
+                .setValue(currentThumbnail)
+                .setRequired(false);
 
-            // ==========================================
-            // ADD MODAL COMPONENTS
-            // ==========================================
+            // Add inputs to modal (2 per row)
+            const row1 = new ActionRowBuilder().addComponents(titleInput);
+            const row2 = new ActionRowBuilder().addComponents(descriptionInput);
+            const row3 = new ActionRowBuilder().addComponents(colorInput);
+            const row4 = new ActionRowBuilder().addComponents(imageInput);
+            const row5 = new ActionRowBuilder().addComponents(thumbnailInput);
 
-            modal.addComponents(
+            modal.addComponents(row1, row2, row3, row4, row5);
 
-                new ActionRowBuilder()
-                    .addComponents(titleInput),
-
-                new ActionRowBuilder()
-                    .addComponents(descriptionInput),
-
-                new ActionRowBuilder()
-                    .addComponents(colorInput),
-
-                new ActionRowBuilder()
-                    .addComponents(imageInput),
-
-                new ActionRowBuilder()
-                    .addComponents(thumbnailInput)
-            );
-
-            // ==========================================
-            // SHOW MODAL
-            // ==========================================
-
+            // Show modal
             await interaction.showModal(modal);
 
         } catch (error) {
-
-            console.error(
-                'Embed edit command error:',
-                error
-            );
-
-            if (!interaction.replied) {
-                await interaction.reply({
-                    content:
-                        '❌ Could not open the embed editor.\n' +
-                        'Check the Message ID and Channel ID.',
+            console.error('Embed edit command error:', error);
+            
+            if (error.code === 10008) {
+                return interaction.reply({
+                    content: '❌ Message not found. Make sure the ID is correct.',
                     ephemeral: true
-                }).catch(() => {});
+                });
             }
+
+            await interaction.reply({
+                content: `❌ Error: ${error.message}`,
+                ephemeral: true
+            });
         }
     }
 };
