@@ -7,7 +7,6 @@ export default {
     name: 'embed_edit',
 
     async execute(interaction, client) {
-        // Owner check
         if (interaction.user.id !== OWNER_ID) {
             return interaction.reply({
                 content: '❌ Only the bot owner can use this.',
@@ -15,18 +14,17 @@ export default {
             });
         }
 
-        // Get IDs from customId (embed_edit:messageId:channelId)
         const [, messageId, channelId] = interaction.customId.split(':');
 
-        // Get modal values
+        // 👇 Footer যোগ করো
         const title = interaction.fields.getTextInputValue('title');
         const description = interaction.fields.getTextInputValue('description');
         const color = interaction.fields.getTextInputValue('color');
         const image = interaction.fields.getTextInputValue('image');
         const thumbnail = interaction.fields.getTextInputValue('thumbnail');
+        const footer = interaction.fields.getTextInputValue('footer'); // 👈 NEW
 
-        // Check if at least one field is filled
-        if (!title && !description && !color && !image && !thumbnail) {
+        if (!title && !description && !color && !image && !thumbnail && !footer) {
             return interaction.reply({
                 content: '❌ You must fill at least one field.',
                 ephemeral: true
@@ -34,7 +32,6 @@ export default {
         }
 
         try {
-            // Fetch channel
             const channel = await client.channels.fetch(channelId);
             if (!channel?.isTextBased()) {
                 return interaction.reply({
@@ -43,10 +40,8 @@ export default {
                 });
             }
 
-            // Fetch message
             const message = await channel.messages.fetch(messageId);
 
-            // Check bot ownership
             if (message.author.id !== client.user.id) {
                 return interaction.reply({
                     content: '❌ I can only edit messages sent by me.',
@@ -54,7 +49,6 @@ export default {
                 });
             }
 
-            // Check if message has embed
             if (!message.embeds.length) {
                 return interaction.reply({
                     content: '❌ This message does not contain an embed.',
@@ -62,10 +56,8 @@ export default {
                 });
             }
 
-            // Start with existing embed
             const embed = EmbedBuilder.from(message.embeds[0]);
 
-            // Update fields if provided
             if (title.trim()) embed.setTitle(title.trim());
             else if (title === '') embed.setTitle(null);
 
@@ -91,10 +83,15 @@ export default {
             if (thumbnail.trim()) embed.setThumbnail(thumbnail.trim());
             else if (thumbnail === '') embed.setThumbnail(null);
 
-            // Update the message
+            // 👇 Footer handle করো
+            if (footer.trim()) {
+                embed.setFooter({ text: footer.trim() });
+            } else if (footer === '') {
+                embed.setFooter(null);
+            }
+
             await message.edit({ embeds: [embed] });
 
-            // Success response
             await interaction.reply({
                 content: `✅ **Embed updated successfully!**\n\n` +
                         `[Jump to message](${message.url})`,
