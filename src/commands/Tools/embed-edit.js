@@ -79,7 +79,7 @@ export default {
                 });
             }
 
-            // Get current embed data (for pre-filling the modal)
+            // Get current embed data
             const currentEmbed = message.embeds[0];
             const currentTitle = currentEmbed.title || '';
             const currentDescription = currentEmbed.description || '';
@@ -133,7 +133,7 @@ export default {
                 .setValue(currentThumbnail)
                 .setRequired(false);
 
-            // Add inputs to modal (2 per row)
+            // Add inputs to modal
             const row1 = new ActionRowBuilder().addComponents(titleInput);
             const row2 = new ActionRowBuilder().addComponents(descriptionInput);
             const row3 = new ActionRowBuilder().addComponents(colorInput);
