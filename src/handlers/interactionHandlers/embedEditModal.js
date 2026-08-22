@@ -1,10 +1,10 @@
-// interactionHandlers/embedEditModal.js
+// src/handlers/interactionHandlers/embedEditModal.js
 import { EmbedBuilder } from 'discord.js';
 
 const OWNER_ID = '1054967242497982476';
 
 export default {
-    name: 'embed_edit',  // 👈 এই নামটা customId এর সাথে match করতে হবে
+    name: 'embed_edit',
 
     async execute(interaction, client) {
         if (interaction.user.id !== OWNER_ID) {
