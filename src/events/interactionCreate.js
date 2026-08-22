@@ -413,11 +413,29 @@ export default {
           }
 
           const [customId, ...args] = interaction.customId.split(':');
-          const modal = client.modals.get(customId);
+          
+          // 👇 MODIFIED: Auto-load embed_edit modal if not found
+          let modal = client.modals.get(customId);
+          
+          if (!modal && customId === 'embed_edit') {
+            try {
+              const { default: embedEditModal } = await import('../interactionHandlers/embedEditModal.js');
+              client.modals.set('embed_edit', embedEditModal);
+              modal = embedEditModal;
+              logger.info('Auto-loaded embed_edit modal handler', {
+                event: 'modal.auto_load',
+                traceId: interactionTraceContext.traceId
+              });
+            } catch (loadError) {
+              logger.error('Failed to auto-load embed_edit modal:', {
+                error: loadError.message,
+                traceId: interactionTraceContext.traceId
+              });
+            }
+          }
 
           if (!modal) {
             if (!interaction.customId.includes(':')) {
-
               return;
             }
 
