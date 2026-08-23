@@ -3,10 +3,10 @@ import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, But
 export default {
   data: new SlashCommandBuilder()
     .setName('role-toggle')
-    .setDescription('রোল টগল বাটন সহ Embed পাঠান')
+    .setDescription('Send embed with role toggle button')
     .addRoleOption(option =>
       option.setName('role')
-        .setDescription('যে রোল টগল করতে চান')
+        .setDescription('The role to toggle')
         .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
@@ -15,14 +15,14 @@ export default {
     const role = interaction.options.getRole('role');
 
     const embed = new EmbedBuilder()
-      .setTitle('🎫 রোল নিন')
-      .setDescription(`**${role.name}** রোল নিতে বা রিমুভ করতে নিচের বাটনে ক্লিক করুন।`)
+      .setTitle('🎫 Get Your Role')
+      .setDescription(`Click the button below to get or remove the **${role.name}** role.`)
       .setColor('#00FF00')
       .setTimestamp();
 
     const button = new ButtonBuilder()
       .setCustomId(`toggle_role_${role.id}`)
-      .setLabel(`🔘 ${role.name} টগল করুন`)
+      .setLabel(`🔘 Toggle ${role.name}`)
       .setStyle(ButtonStyle.Primary);
 
     const row = new ActionRowBuilder().addComponents(button);
@@ -33,7 +33,7 @@ export default {
     });
 
     await interaction.reply({
-      content: `✅ রোল টগল বাটন পাঠানো হয়েছে!`,
+      content: '✅ Role toggle button sent!',
       ephemeral: true
     });
   }
