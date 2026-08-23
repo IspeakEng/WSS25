@@ -307,6 +307,48 @@ export default {
             }
           }
         } else if (interaction.isButton()) {
+          // ============================================================
+          // 🆕 NEW: ROLE TOGGLE BUTTON HANDLER
+          // ============================================================
+          if (interaction.customId.startsWith('toggle_role_')) {
+            try {
+              await interaction.deferReply({ ephemeral: true });
+
+              const roleId = interaction.customId.replace('toggle_role_', '');
+              const role = interaction.guild.roles.cache.get(roleId);
+              const member = interaction.member;
+
+              if (!role) {
+                return interaction.editReply('❌ রোল পাওয়া যায়নি!');
+              }
+
+              // Check bot's role position
+              const botMember = interaction.guild.members.me;
+              if (botMember.roles.highest.position <= role.position) {
+                return interaction.editReply('❌ আমার রোল এই রোলের নিচে! দয়া করে আমার রোলকে টার্গেট রোলের উপরে নিন।');
+              }
+
+              if (member.roles.cache.has(roleId)) {
+                await member.roles.remove(role);
+                await interaction.editReply(`✅ **${role.name}** রোল সরানো হয়েছে!`);
+              } else {
+                await member.roles.add(role);
+                await interaction.editReply(`✅ **${role.name}** রোল যোগ করা হয়েছে!`);
+              }
+            } catch (error) {
+              logger.error('Role toggle button error:', {
+                error: error.message,
+                stack: error.stack,
+                guildId: interaction.guildId,
+                userId: interaction.user?.id,
+                customId: interaction.customId
+              });
+              await interaction.editReply('❌ রোল টগল করতে সমস্যা হয়েছে!').catch(() => {});
+            }
+            return;
+          }
+          // ============================================================
+
           if (interaction.customId.startsWith('shared_todo_')) {
             const parts = interaction.customId.split('_');
             const buttonType = parts.slice(0, 3).join('_');
