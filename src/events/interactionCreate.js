@@ -308,7 +308,7 @@ export default {
           }
         } else if (interaction.isButton()) {
           // ============================================================
-          // ROLE TOGGLE BUTTON HANDLER
+          // ROLE TOGGLE BUTTON HANDLER (EXCLUSIVE VERSION)
           // ============================================================
           if (interaction.customId.startsWith('toggle_role_')) {
             try {
@@ -327,6 +327,52 @@ export default {
                 return interaction.editReply('❌ My role is below the target role! Please move my role above.');
               }
 
+              // ========== EXCLUSIVE GROUPS ==========
+              // এখানে আপনার এক্সক্লুসিভ গ্রুপ যোগ করুন
+              const exclusiveGroups = {
+                'pronouns': ['He/Him', 'She/Her', 'They/Them'],
+                'gender': ['Male', 'Female', 'Non-Binary'],
+                'region': ['Asia', 'Europe', 'America', 'Africa']
+              };
+              // =====================================
+
+              // Check if this role is in any exclusive group
+              let isExclusive = false;
+              let groupRoles = [];
+
+              for (const [groupName, roles] of Object.entries(exclusiveGroups)) {
+                if (roles.includes(role.name)) {
+                  isExclusive = true;
+                  groupRoles = roles;
+                  break;
+                }
+              }
+
+              // If exclusive role
+              if (isExclusive) {
+                // Remove all other roles from this group
+                const rolesToRemove = member.roles.cache.filter(r => 
+                  groupRoles.includes(r.name) && r.id !== role.id
+                );
+
+                for (const r of rolesToRemove.values()) {
+                  await member.roles.remove(r);
+                }
+
+                // If user already has this role, remove it
+                if (member.roles.cache.has(roleId)) {
+                  await member.roles.remove(role);
+                  await interaction.editReply(`✅ **${role.name}** role has been removed!`);
+                  return;
+                }
+
+                // Add the role
+                await member.roles.add(role);
+                await interaction.editReply(`✅ **${role.name}** role has been added!`);
+                return;
+              }
+
+              // Normal toggle (non-exclusive)
               if (member.roles.cache.has(roleId)) {
                 await member.roles.remove(role);
                 await interaction.editReply(`✅ **${role.name}** role has been removed!`);
@@ -334,6 +380,7 @@ export default {
                 await member.roles.add(role);
                 await interaction.editReply(`✅ **${role.name}** role has been added!`);
               }
+
             } catch (error) {
               logger.error('Role toggle button error:', {
                 error: error.message,
