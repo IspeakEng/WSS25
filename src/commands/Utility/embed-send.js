@@ -1,10 +1,9 @@
-import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, PermissionsBitField } from 'discord.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('embed-send')
-    .setDescription('Send embed with role toggle buttons')
-    // Channel options
+    .setDescription('Send a custom embed without buttons')
     .addStringOption(option =>
       option.setName('server_id')
         .setDescription('Target server ID (leave empty for current server)')
@@ -15,22 +14,20 @@ export default {
         .setDescription('Target channel ID (leave empty for current channel)')
         .setRequired(false)
     )
-    // Message content
     .addStringOption(option =>
       option.setName('message')
         .setDescription('Normal message to send above embed')
         .setRequired(false)
     )
-    // Embed options
     .addStringOption(option =>
       option.setName('title')
         .setDescription('Embed title')
-        .setRequired(false)
+        .setRequired(true)
     )
     .addStringOption(option =>
       option.setName('description')
         .setDescription('Embed description')
-        .setRequired(false)
+        .setRequired(true)
     )
     .addStringOption(option =>
       option.setName('image')
@@ -52,82 +49,69 @@ export default {
         .setDescription('Embed footer text')
         .setRequired(false)
     )
-    // Roles (1-5)
-    .addRoleOption(option =>
-      option.setName('role1')
-        .setDescription('First role to toggle')
-        .setRequired(false)
-    )
-    .addRoleOption(option =>
-      option.setName('role2')
-        .setDescription('Second role to toggle')
-        .setRequired(false)
-    )
-    .addRoleOption(option =>
-      option.setName('role3')
-        .setDescription('Third role to toggle')
-        .setRequired(false)
-    )
-    .addRoleOption(option =>
-      option.setName('role4')
-        .setDescription('Fourth role to toggle')
-        .setRequired(false)
-    )
-    .addRoleOption(option =>
-      option.setName('role5')
-        .setDescription('Fifth role to toggle')
-        .setRequired(false)
-    )
-    // Button labels
     .addStringOption(option =>
-      option.setName('button1_label')
-        .setDescription('Label for button 1')
+      option.setName('footer_icon')
+        .setDescription('Footer icon URL')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button2_label')
-        .setDescription('Label for button 2')
+      option.setName('author')
+        .setDescription('Author name')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button3_label')
-        .setDescription('Label for button 3')
+      option.setName('author_icon')
+        .setDescription('Author icon URL')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button4_label')
-        .setDescription('Label for button 4')
+      option.setName('author_url')
+        .setDescription('Author URL')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button5_label')
-        .setDescription('Label for button 5')
-        .setRequired(false)
-    )
-    // Button colors
-    .addStringOption(option =>
-      option.setName('button1_color')
-        .setDescription('Button 1 color: primary, success, danger, secondary')
+      option.setName('field1_name')
+        .setDescription('Field 1 name')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button2_color')
-        .setDescription('Button 2 color: primary, success, danger, secondary')
+      option.setName('field1_value')
+        .setDescription('Field 1 value')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button3_color')
-        .setDescription('Button 3 color: primary, success, danger, secondary')
+      option.setName('field1_inline')
+        .setDescription('Field 1 inline? (true/false)')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button4_color')
-        .setDescription('Button 4 color: primary, success, danger, secondary')
+      option.setName('field2_name')
+        .setDescription('Field 2 name')
         .setRequired(false)
     )
     .addStringOption(option =>
-      option.setName('button5_color')
-        .setDescription('Button 5 color: primary, success, danger, secondary')
+      option.setName('field2_value')
+        .setDescription('Field 2 value')
+        .setRequired(false)
+    )
+    .addStringOption(option =>
+      option.setName('field2_inline')
+        .setDescription('Field 2 inline? (true/false)')
+        .setRequired(false)
+    )
+    .addStringOption(option =>
+      option.setName('field3_name')
+        .setDescription('Field 3 name')
+        .setRequired(false)
+    )
+    .addStringOption(option =>
+      option.setName('field3_value')
+        .setDescription('Field 3 value')
+        .setRequired(false)
+    )
+    .addStringOption(option =>
+      option.setName('field3_inline')
+        .setDescription('Field 3 inline? (true/false)')
         .setRequired(false)
     )
     .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
@@ -143,34 +127,24 @@ export default {
     const thumbnail = interaction.options.getString('thumbnail');
     const color = interaction.options.getString('color') || '#5865F2';
     const footer = interaction.options.getString('footer');
+    const footerIcon = interaction.options.getString('footer_icon');
+    const author = interaction.options.getString('author');
+    const authorIcon = interaction.options.getString('author_icon');
+    const authorUrl = interaction.options.getString('author_url');
 
-    // Get roles
-    const roles = [];
-    const roleOptions = ['role1', 'role2', 'role3', 'role4', 'role5'];
-    for (const roleOpt of roleOptions) {
-      const role = interaction.options.getRole(roleOpt);
-      if (role) roles.push(role);
-    }
-
-    if (roles.length === 0) {
-      return interaction.reply({
-        content: '❌ Please specify at least one role! Use role1, role2, etc.',
-        ephemeral: true
-      });
-    }
-
-    // Get button labels
-    const buttonLabels = [];
-    for (let i = 1; i <= 5; i++) {
-      const label = interaction.options.getString(`button${i}_label`);
-      buttonLabels.push(label || null);
-    }
-
-    // Get button colors
-    const buttonColors = [];
-    for (let i = 1; i <= 5; i++) {
-      const color = interaction.options.getString(`button${i}_color`);
-      buttonColors.push(color || null);
+    // Get fields
+    const fields = [];
+    for (let i = 1; i <= 3; i++) {
+      const name = interaction.options.getString(`field${i}_name`);
+      const value = interaction.options.getString(`field${i}_value`);
+      const inline = interaction.options.getString(`field${i}_inline`);
+      if (name && value) {
+        fields.push({
+          name,
+          value,
+          inline: inline === 'true'
+        });
+      }
     }
 
     // Target server and channel
@@ -207,51 +181,20 @@ export default {
 
     // Create embed
     const embed = new EmbedBuilder()
+      .setTitle(title)
+      .setDescription(description)
+      .setColor(color)
       .setTimestamp();
 
-    if (title) embed.setTitle(title);
-    if (description) embed.setDescription(description);
-    if (color) embed.setColor(color);
     if (image) embed.setImage(image);
     if (thumbnail) embed.setThumbnail(thumbnail);
-    if (footer) embed.setFooter({ text: footer });
-
-    // Create buttons
-    const colorMap = {
-      'primary': ButtonStyle.Primary,
-      'success': ButtonStyle.Success,
-      'danger': ButtonStyle.Danger,
-      'secondary': ButtonStyle.Secondary
-    };
-
-    const defaultColors = [ButtonStyle.Primary, ButtonStyle.Success, ButtonStyle.Danger, ButtonStyle.Secondary, ButtonStyle.Primary];
-    const buttons = [];
-
-    roles.forEach((role, index) => {
-      const label = buttonLabels[index] || `🔘 ${role.name}`;
-      const colorInput = buttonColors[index] || 'primary';
-      const style = colorMap[colorInput.toLowerCase()] || defaultColors[index % defaultColors.length];
-
-      buttons.push(
-        new ButtonBuilder()
-          .setCustomId(`toggle_role_${role.id}`)
-          .setLabel(label.substring(0, 80))
-          .setStyle(style)
-      );
-    });
-
-    // Arrange buttons (max 5 per row)
-    const rows = [];
-    for (let i = 0; i < buttons.length; i += 5) {
-      const row = new ActionRowBuilder();
-      buttons.slice(i, i + 5).forEach(btn => row.addComponents(btn));
-      rows.push(row);
-    }
+    if (footer) embed.setFooter({ text: footer, iconURL: footerIcon || undefined });
+    if (author) embed.setAuthor({ name: author, iconURL: authorIcon || undefined, url: authorUrl || undefined });
+    if (fields.length > 0) embed.addFields(fields);
 
     // Prepare message
     const messagePayload = {
-      embeds: [embed],
-      components: rows
+      embeds: [embed]
     };
 
     if (messageContent) {
