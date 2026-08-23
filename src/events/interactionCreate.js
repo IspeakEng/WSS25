@@ -308,7 +308,7 @@ export default {
           }
         } else if (interaction.isButton()) {
           // ============================================================
-          // 🆕 NEW: ROLE TOGGLE BUTTON HANDLER
+          // ROLE TOGGLE BUTTON HANDLER
           // ============================================================
           if (interaction.customId.startsWith('toggle_role_')) {
             try {
@@ -319,31 +319,29 @@ export default {
               const member = interaction.member;
 
               if (!role) {
-                return interaction.editReply('❌ রোল পাওয়া যায়নি!');
+                return interaction.editReply('❌ Role not found!');
               }
 
-              // Check bot's role position
               const botMember = interaction.guild.members.me;
               if (botMember.roles.highest.position <= role.position) {
-                return interaction.editReply('❌ আমার রোল এই রোলের নিচে! দয়া করে আমার রোলকে টার্গেট রোলের উপরে নিন।');
+                return interaction.editReply('❌ My role is below the target role! Please move my role above.');
               }
 
               if (member.roles.cache.has(roleId)) {
                 await member.roles.remove(role);
-                await interaction.editReply(`✅ **${role.name}** রোল সরানো হয়েছে!`);
+                await interaction.editReply(`✅ **${role.name}** role has been removed!`);
               } else {
                 await member.roles.add(role);
-                await interaction.editReply(`✅ **${role.name}** রোল যোগ করা হয়েছে!`);
+                await interaction.editReply(`✅ **${role.name}** role has been added!`);
               }
             } catch (error) {
               logger.error('Role toggle button error:', {
                 error: error.message,
-                stack: error.stack,
                 guildId: interaction.guildId,
                 userId: interaction.user?.id,
                 customId: interaction.customId
               });
-              await interaction.editReply('❌ রোল টগল করতে সমস্যা হয়েছে!').catch(() => {});
+              await interaction.editReply('❌ Failed to toggle role!').catch(() => {});
             }
             return;
           }
@@ -456,7 +454,6 @@ export default {
 
           const [customId, ...args] = interaction.customId.split(':');
           
-          // 👇 MODIFIED: Auto-load embed_edit modal if not found
           let modal = client.modals.get(customId);
           
           if (!modal && customId === 'embed_edit') {
