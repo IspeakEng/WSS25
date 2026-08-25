@@ -167,16 +167,6 @@ export async function getReactionRoleMessage(client, guildId, messageId) {
     }
 }
 
-/**
- * Create a reaction-role message.
- *
- * roles format:
- *
- * {
- *   "🎀": "ROLE_ID",
- *   "💎": "ROLE_ID"
- * }
- */
 export async function createReactionRoleMessage(
     client,
     guildId,
@@ -229,6 +219,7 @@ export async function createReactionRoleMessage(
         messageId,
         roles,
         unique: false,
+        exclusiveGroups: {}, // New field for exclusive groups
         createdAt: new Date().toISOString()
     };
 
@@ -243,9 +234,172 @@ export async function createReactionRoleMessage(
     return reactionRoleData;
 }
 
-/**
- * Add one emoji -> role mapping.
- */
+// ========== NEW: ADD EXCLUSIVE ROLE ==========
+export async function addExclusiveReactionRole(
+    client,
+    guildId,
+    messageId,
+    emoji,
+    roleId,
+    groupName,
+    channelId = null
+) {
+    validateGuildId(guildId);
+    validateMessageId(messageId);
+    validateRoleId(roleId);
+
+    if (!emoji || typeof emoji !== 'string') {
+        throw createError(
+            'Invalid emoji',
+            ErrorTypes.VALIDATION,
+            'You must provide a valid emoji.',
+            { emoji }
+        );
+    }
+
+    if (!groupName || typeof groupName !== 'string') {
+        throw createError(
+            'Invalid group name',
+            ErrorTypes.VALIDATION,
+            'You must provide a group name for exclusive roles.',
+            { groupName }
+        );
+    }
+
+    const role = await validateRoleSafety(client, guildId, roleId);
+
+    const key = getReactionRoleKey(guildId, messageId);
+
+    let data = await getReactionRoleMessage(client, guildId, messageId);
+
+    if (!data) {
+        data = {
+            guildId,
+            channelId: channelId || '',
+            messageId,
+            roles: {},
+            unique: false,
+            exclusiveGroups: {},
+            createdAt: new Date().toISOString()
+        };
+    }
+
+    if (!data.roles || Array.isArray(data.roles)) {
+        data.roles = {};
+    }
+
+    if (!data.exclusiveGroups || Array.isArray(data.exclusiveGroups)) {
+        data.exclusiveGroups = {};
+    }
+
+    // Check if emoji already exists
+    if (data.roles[emoji]) {
+        throw createError(
+            `Emoji already exists: ${emoji}`,
+            ErrorTypes.VALIDATION,
+            `The emoji ${emoji} is already assigned to a role on this message.`,
+            {
+                emoji,
+                existingRoleId: data.roles[emoji]
+            }
+        );
+    }
+
+    // Check limit
+    if (Object.keys(data.roles).length >= MAX_ROLES_PER_MESSAGE) {
+        throw createError(
+            'Reaction role limit reached',
+            ErrorTypes.VALIDATION,
+            `This message already has the maximum of ${MAX_ROLES_PER_MESSAGE} reaction roles.`,
+            {
+                limit: MAX_ROLES_PER_MESSAGE
+            }
+        );
+    }
+
+    // Add role
+    data.roles[emoji] = role.id;
+
+    // Add to exclusive group
+    if (!data.exclusiveGroups[groupName]) {
+        data.exclusiveGroups[groupName] = [];
+    }
+    data.exclusiveGroups[groupName].push({
+        emoji: emoji,
+        roleId: role.id
+    });
+
+    if (channelId) {
+        data.channelId = channelId;
+    }
+
+    await client.db.set(key, data);
+
+    logger.info(
+        `Added exclusive role ${emoji} -> ${role.name} to group ${groupName} on message ${messageId}`
+    );
+
+    return data;
+}
+
+// ========== NEW: GET EXCLUSIVE GROUP ROLES ==========
+export async function getExclusiveGroupRoles(client, guildId, messageId, groupName) {
+    try {
+        const data = await getReactionRoleMessage(client, guildId, messageId);
+        
+        if (!data || !data.exclusiveGroups || !data.exclusiveGroups[groupName]) {
+            return [];
+        }
+
+        return data.exclusiveGroups[groupName];
+    } catch (error) {
+        logger.error('Error getting exclusive group roles:', error);
+        return [];
+    }
+}
+
+// ========== NEW: CHECK IF ROLE IS EXCLUSIVE ==========
+export async function isExclusiveRole(client, guildId, messageId, roleId) {
+    try {
+        const data = await getReactionRoleMessage(client, guildId, messageId);
+        
+        if (!data || !data.exclusiveGroups) {
+            return null;
+        }
+
+        for (const [groupName, roles] of Object.entries(data.exclusiveGroups)) {
+            for (const role of roles) {
+                if (role.roleId === roleId) {
+                    return groupName;
+                }
+            }
+        }
+
+        return null;
+    } catch (error) {
+        logger.error('Error checking exclusive role:', error);
+        return null;
+    }
+}
+
+// ========== NEW: GET ALL EXCLUSIVE GROUPS ==========
+export async function getAllExclusiveGroups(client, guildId, messageId) {
+    try {
+        const data = await getReactionRoleMessage(client, guildId, messageId);
+        
+        if (!data || !data.exclusiveGroups) {
+            return {};
+        }
+
+        return data.exclusiveGroups;
+    } catch (error) {
+        logger.error('Error getting exclusive groups:', error);
+        return {};
+    }
+}
+
+// ========== EXISTING FUNCTIONS (Unchanged) ==========
+
 export async function addReactionRole(
     client,
     guildId,
@@ -271,11 +425,7 @@ export async function addReactionRole(
 
     const key = getReactionRoleKey(guildId, messageId);
 
-    let data = await getReactionRoleMessage(
-        client,
-        guildId,
-        messageId
-    );
+    let data = await getReactionRoleMessage(client, guildId, messageId);
 
     if (!data) {
         data = {
@@ -284,6 +434,7 @@ export async function addReactionRole(
             messageId,
             roles: {},
             unique: false,
+            exclusiveGroups: {},
             createdAt: new Date().toISOString()
         };
     }
@@ -292,16 +443,18 @@ export async function addReactionRole(
         data.roles = {};
     }
 
-    const existingEmoji = data.roles[emoji];
+    if (!data.exclusiveGroups || Array.isArray(data.exclusiveGroups)) {
+        data.exclusiveGroups = {};
+    }
 
-    if (existingEmoji) {
+    if (data.roles[emoji]) {
         throw createError(
             `Emoji already exists: ${emoji}`,
             ErrorTypes.VALIDATION,
             `The emoji ${emoji} is already assigned to a role on this message.`,
             {
                 emoji,
-                existingRoleId: existingEmoji
+                existingRoleId: data.roles[emoji]
             }
         );
     }
@@ -332,9 +485,6 @@ export async function addReactionRole(
     return data;
 }
 
-/**
- * Remove one emoji -> role mapping.
- */
 export async function removeReactionRole(
     client,
     guildId,
@@ -346,42 +496,39 @@ export async function removeReactionRole(
 
     const key = getReactionRoleKey(guildId, messageId);
 
-    const data = await getReactionRoleMessage(
-        client,
-        guildId,
-        messageId
-    );
+    const data = await getReactionRoleMessage(client, guildId, messageId);
 
     if (!data?.roles?.[emoji]) {
         return false;
+    }
+
+    // Also remove from exclusive groups if present
+    if (data.exclusiveGroups) {
+        for (const [groupName, roles] of Object.entries(data.exclusiveGroups)) {
+            const index = roles.findIndex(r => r.emoji === emoji);
+            if (index !== -1) {
+                roles.splice(index, 1);
+                if (roles.length === 0) {
+                    delete data.exclusiveGroups[groupName];
+                }
+                break;
+            }
+        }
     }
 
     delete data.roles[emoji];
 
     if (Object.keys(data.roles).length === 0) {
         await client.db.delete(key);
-
-        logger.info(
-            `Removed last reaction role from ${messageId}`
-        );
+        logger.info(`Removed last reaction role from ${messageId}`);
     } else {
         await client.db.set(key, data);
-
-        logger.info(
-            `Removed reaction role ${emoji} from ${messageId}`
-        );
+        logger.info(`Removed reaction role ${emoji} from ${messageId}`);
     }
 
     return true;
 }
 
-/**
- * Enable / disable unique mode.
- *
- * When enabled:
- * reacting to one role automatically removes
- * the other reaction-role roles from that message.
- */
 export async function setReactionRoleUnique(
     client,
     guildId,
@@ -393,11 +540,7 @@ export async function setReactionRoleUnique(
 
     const key = getReactionRoleKey(guildId, messageId);
 
-    const data = await getReactionRoleMessage(
-        client,
-        guildId,
-        messageId
-    );
+    const data = await getReactionRoleMessage(client, guildId, messageId);
 
     if (!data) {
         throw createError(
@@ -428,11 +571,7 @@ export async function deleteReactionRoleMessage(
 
     const key = getReactionRoleKey(guildId, messageId);
 
-    const data = await getReactionRoleMessage(
-        client,
-        guildId,
-        messageId
-    );
+    const data = await getReactionRoleMessage(client, guildId, messageId);
 
     if (!data) {
         return true;
@@ -511,18 +650,15 @@ export async function getAllReactionRoleMessages(
 
             if (!data) continue;
 
-            const actualData =
-                data?.value ??
-                data;
+            const actualData = data?.value ?? data;
 
-            if (
-                actualData?.messageId &&
-                actualData?.channelId
-            ) {
+            if (actualData?.messageId && actualData?.channelId) {
                 if (!actualData.roles) {
                     actualData.roles = {};
                 }
-
+                if (!actualData.exclusiveGroups) {
+                    actualData.exclusiveGroups = {};
+                }
                 messages.push(actualData);
             }
         } catch (error) {
@@ -556,19 +692,15 @@ export async function setReactionRoleChannel(
 
     const key = getReactionRoleKey(guildId, messageId);
 
-    const data =
-        await getReactionRoleMessage(
-            client,
-            guildId,
-            messageId
-        ) || {
-            guildId,
-            messageId,
-            channelId,
-            roles: {},
-            unique: false,
-            createdAt: new Date().toISOString()
-        };
+    const data = await getReactionRoleMessage(client, guildId, messageId) || {
+        guildId,
+        messageId,
+        channelId,
+        roles: {},
+        unique: false,
+        exclusiveGroups: {},
+        createdAt: new Date().toISOString()
+    };
 
     data.channelId = channelId;
 
@@ -598,33 +730,22 @@ export async function reconcileReactionRoleMessages(
         let messages = [];
 
         try {
-            messages =
-                await getAllReactionRoleMessages(
-                    client,
-                    targetGuildId
-                );
+            messages = await getAllReactionRoleMessages(client, targetGuildId);
         } catch {
             summary.errors++;
             continue;
         }
 
-        const guild =
-            client.guilds.cache.get(targetGuildId) ||
-            await client.guilds.fetch(targetGuildId)
-                .catch(() => null);
+        const guild = client.guilds.cache.get(targetGuildId) ||
+            await client.guilds.fetch(targetGuildId).catch(() => null);
 
         if (!guild) {
             for (const panel of messages) {
                 await client.db.delete(
-                    getReactionRoleKey(
-                        targetGuildId,
-                        panel.messageId
-                    )
+                    getReactionRoleKey(targetGuildId, panel.messageId)
                 );
-
                 summary.removedMessages++;
             }
-
             continue;
         }
 
@@ -632,41 +753,29 @@ export async function reconcileReactionRoleMessages(
             summary.scannedMessages++;
 
             try {
-                const channel =
-                    guild.channels.cache.get(panel.channelId) ||
-                    await guild.channels.fetch(panel.channelId)
-                        .catch(() => null);
+                const channel = guild.channels.cache.get(panel.channelId) ||
+                    await guild.channels.fetch(panel.channelId).catch(() => null);
 
                 if (!channel?.isTextBased?.()) {
                     await client.db.delete(
-                        getReactionRoleKey(
-                            targetGuildId,
-                            panel.messageId
-                        )
+                        getReactionRoleKey(targetGuildId, panel.messageId)
                     );
-
                     summary.removedMessages++;
                     continue;
                 }
 
-                const message =
-                    await channel.messages
-                        .fetch(panel.messageId)
-                        .catch(() => null);
+                const message = await channel.messages
+                    .fetch(panel.messageId)
+                    .catch(() => null);
 
                 if (!message) {
                     await client.db.delete(
-                        getReactionRoleKey(
-                            targetGuildId,
-                            panel.messageId
-                        )
+                        getReactionRoleKey(targetGuildId, panel.messageId)
                     );
-
                     summary.removedMessages++;
                 }
             } catch (error) {
                 summary.errors++;
-
                 logger.warn(
                     `Failed checking reaction role message ${panel.messageId}:`,
                     error
