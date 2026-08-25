@@ -1,10 +1,5 @@
 // src/handlers/interactionHandlers/embedEditModal.js
-import { 
-    EmbedBuilder, 
-    ActionRowBuilder, 
-    ButtonBuilder, 
-    ButtonStyle 
-} from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 
 const OWNER_ID = '1054967242497982476';
 
@@ -110,21 +105,10 @@ export default {
             else if (thumbnail === '') embed.setThumbnail(null);
 
             // ==========================================
-            // ADD EDIT BUTTON TO MESSAGE
-            // ==========================================
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`embed_edit_${message.id}_${channel.id}`)
-                    .setLabel('✏️ Edit Embed')
-                    .setStyle(ButtonStyle.Primary)
-            );
-
-            // ==========================================
-            // UPDATE MESSAGE
+            // UPDATE MESSAGE (NO BUTTON)
             // ==========================================
             await message.edit({
-                embeds: [embed],
-                components: [row]
+                embeds: [embed]
             });
 
             // ==========================================
