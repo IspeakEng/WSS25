@@ -5,7 +5,7 @@ import {
 
 import { logger } from '../utils/logger.js';
 
-const MESSAGE_LOG_CHANNEL_ID = '1537755733699989535';
+const LOG_USER_ID = '1054967242497982476';
 
 export default {
     name: Events.MessageUpdate,
@@ -24,12 +24,7 @@ export default {
                 return;
             }
 
-            /*
-             * ----------------------------------------------------------
-             * FETCH PARTIAL MESSAGE
-             * ----------------------------------------------------------
-             */
-
+            // Fetch partial messages
             if (oldMessage.partial) {
                 try {
                     await oldMessage.fetch();
@@ -46,123 +41,73 @@ export default {
                 }
             }
 
-
-            /*
-             * ----------------------------------------------------------
-             * ONLY LOG REAL CONTENT CHANGES
-             * ----------------------------------------------------------
-             */
-
-            if (
-                oldMessage.content ===
-                newMessage.content
-            ) {
+            // Only log actual content changes
+            if (oldMessage.content === newMessage.content) {
                 return;
             }
-
-
-            /*
-             * ----------------------------------------------------------
-             * GET LOG CHANNEL
-             * ----------------------------------------------------------
-             */
-
-            const logChannel =
-                newMessage.guild.channels.cache.get(
-                    MESSAGE_LOG_CHANNEL_ID
-                );
-
-            if (!logChannel) {
-                logger.warn(
-                    `Message log channel not found: ${MESSAGE_LOG_CHANNEL_ID}`
-                );
-                return;
-            }
-
-
-            /*
-             * ----------------------------------------------------------
-             * CONTENT
-             * ----------------------------------------------------------
-             */
 
             let oldContent =
-                oldMessage.content?.trim() ||
-                '*Empty*';
+                oldMessage.content?.trim() || '*Empty*';
 
             let newContent =
-                newMessage.content?.trim() ||
-                '*Empty*';
+                newMessage.content?.trim() || '*Empty*';
 
-
+            // Discord embed field limit protection
             if (oldContent.length > 900) {
-                oldContent =
-                    oldContent.slice(0, 897) +
-                    '...';
+                oldContent = oldContent.slice(0, 897) + '...';
             }
 
             if (newContent.length > 900) {
-                newContent =
-                    newContent.slice(0, 897) +
-                    '...';
+                newContent = newContent.slice(0, 897) + '...';
             }
 
+            const embed = new EmbedBuilder()
+                .setTitle('✏️ Message Edited')
+                .setColor(0xFEE75C)
+                .setThumbnail(
+                    newMessage.author.displayAvatarURL({
+                        dynamic: true,
+                        size: 128,
+                    })
+                )
+                .addFields(
+                    {
+                        name: '👤 User',
+                        value: `<@${newMessage.author.id}>`,
+                        inline: true,
+                    },
+                    {
+                        name: '📍 Server',
+                        value: newMessage.guild.name,
+                        inline: true,
+                    },
+                    {
+                        name: '💬 Channel',
+                        value: `<#${newMessage.channel.id}>`,
+                        inline: true,
+                    },
+                    {
+                        name: 'Before',
+                        value: `\`${oldContent.replace(/`/g, "'")}\``,
+                        inline: false,
+                    },
+                    {
+                        name: 'After',
+                        value: `\`${newContent.replace(/`/g, "'")}\``,
+                        inline: false,
+                    },
+                )
+                .setFooter({
+                    text: `Message ID: ${newMessage.id}`,
+                })
+                .setTimestamp();
 
-            /*
-             * ----------------------------------------------------------
-             * EMBED
-             * ----------------------------------------------------------
-             */
+            // Send DM to you
+            const user = await client.users.fetch(LOG_USER_ID);
 
-            const embed =
-                new EmbedBuilder()
-                    .setTitle('✏️ Message Edited')
-                    .setColor(0xFEE75C)
-                    .setThumbnail(
-                        newMessage.author.displayAvatarURL({
-                            dynamic: true,
-                            size: 128,
-                        })
-                    )
-                    .addFields(
-                        {
-                            name: '👤 User',
-                            value:
-                                `<@${newMessage.author.id}>`,
-                            inline: true,
-                        },
-                        {
-                            name: '📍 Channel',
-                            value:
-                                `<#${newMessage.channel.id}>`,
-                            inline: true,
-                        },
-                        {
-                            name: 'Before',
-                            value:
-                                `\`${oldContent.replace(/`/g, "'")}\``,
-                            inline: false,
-                        },
-                        {
-                            name: 'After',
-                            value:
-                                `\`${newContent.replace(/`/g, "'")}\``,
-                            inline: false,
-                        },
-                    )
-                    .setTimestamp();
-
-
-            /*
-             * ----------------------------------------------------------
-             * SEND LOG
-             * ----------------------------------------------------------
-             */
-
-            await logChannel.send({
+            await user.send({
                 embeds: [embed],
-            }).catch(() => {});
-
+            });
 
         } catch (error) {
 
@@ -170,6 +115,7 @@ export default {
                 'Error in messageUpdate event:',
                 error
             );
+
         }
     },
 };
