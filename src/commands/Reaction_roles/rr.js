@@ -4,10 +4,8 @@ import {
     MessageFlags,
 } from 'discord.js';
 
-import {
-    addReactionRole,
-    getReactionRoleMessage,
-} from '../../services/reactionRoleService.js';
+// Change this import - from service to event file
+import { saveReactionRole } from '../events/messageReactionAdd.js';
 
 export default {
     data: new SlashCommandBuilder()
@@ -117,34 +115,12 @@ export default {
                 );
             }
 
-            // Get existing reaction-role configuration
-            const existing = await getReactionRoleMessage(
-                interaction.client,
-                interaction.guild.id,
-                messageId
-            );
-
-            // Count existing reaction roles
-            const existingRoles = existing?.roles || {};
-            const existingCount = Object.keys(existingRoles).length;
-
-            // Maximum 25 reactions per message
-            if (
-                !existingRoles[emojiInput] &&
-                existingCount >= 25
-            ) {
-                return interaction.editReply(
-                    '❌ This message already has **25 reaction roles**, which is the maximum.'
-                );
-            }
-
-            // Check if emoji is already configured
-            if (existingRoles[emojiInput]) {
-                return interaction.editReply(
-                    `❌ The emoji **${emojiInput}** is already assigned to <@&${existingRoles[emojiInput]}>.`
-                );
-            }
-
+            // ========== MEMORY STORAGE CHECK ==========
+            // Check if emoji already exists in memory
+            // Note: We need to check from the event file's memory
+            // Since we can't directly access roleConfigs from here,
+            // we'll rely on the save function to handle duplicate check
+            
             // Add reaction to the Discord message
             await message.react(emojiInput).catch(error => {
                 throw new Error(
@@ -152,23 +128,28 @@ export default {
                 );
             });
 
-            // Save reaction role
-            await addReactionRole(
-                interaction.client,
-                interaction.guild.id,
+            // ========== SAVE TO MEMORY ==========
+            // Save reaction role using memory storage
+            const saved = saveReactionRole(
                 messageId,
                 emojiInput,
-                role.id
+                role.id,
+                interaction.guildId,
+                channel.id
             );
 
-            const total = existingCount + 1;
+            if (!saved) {
+                return interaction.editReply(
+                    '❌ Failed to save reaction role to memory.'
+                );
+            }
 
             return interaction.editReply(
                 `✅ Reaction role added!\n\n` +
                 `**Emoji:** ${emojiInput}\n` +
                 `**Role:** ${role}\n` +
                 `**Message:** [Jump to message](${message.url})\n` +
-                `**Reaction roles:** ${total}/25`
+                `**Storage:** Memory (will reset on bot restart)`
             );
 
         } catch (error) {
