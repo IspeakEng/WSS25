@@ -1,29 +1,6 @@
 import { logger } from '../utils/logger.js';
-import { getReactionRoleKey } from '../utils/database/keys.js';
-import { getGuildConfig, setGuildConfig, patchGuildConfig } from './config/guildConfig.js';
-import {
-    getTicketPanelStatus,
-    getVerificationPanelStatus,
-    getReactionRolePanelStatus,
-} from '../utils/panelStatus.js';
-import { getAllReactionRoleMessages } from './reactionRoleService.js';
 
-async function persistVerificationMessageId(client, guildId, config, messageId) {
-    if (!messageId || config.verification?.messageId === messageId) return;
-    await patchGuildConfig(client, guildId, {
-        verification: { ...config.verification, messageId },
-    });
-}
-
-async function persistReactionRoleMessageId(client, guildId, panelData, messageId) {
-    if (!messageId || panelData.messageId === messageId) return;
-    const oldKey = getReactionRoleKey(guildId, panelData.messageId);
-    panelData.messageId = messageId;
-    const newKey = getReactionRoleKey(guildId, messageId);
-    await client.db.set(newKey, panelData);
-    await client.db.delete(oldKey).catch(() => {});
-}
-
+// ========== TICKET PANELS ==========
 export async function reconcileTicketPanels(client) {
     const summary = {
         scannedGuilds: 0,
@@ -31,44 +8,51 @@ export async function reconcileTicketPanels(client) {
         deletedPanels: 0,
         missingChannels: 0,
         recoveredIds: 0,
-        errors: 0,
+        errors: 0
     };
 
-    for (const guild of client.guilds.cache.values()) {
-        summary.scannedGuilds += 1;
+    try {
+        const guilds = client.guilds.cache;
+        summary.scannedGuilds = guilds.size;
 
-        try {
-            const config = await getGuildConfig(client, guild.id);
-            if (!config?.ticketPanelChannelId) continue;
+        for (const [guildId, guild] of guilds) {
+            try {
+                const key = `ticket_panels_${guildId}`;
+                const data = await client.db.get(key);
+                
+                if (!data || !data.panels) continue;
 
-            const panelStatus = await getTicketPanelStatus(client, guild, config);
+                for (const panel of data.panels) {
+                    try {
+                        const channel = guild.channels.cache.get(panel.channelId);
+                        if (!channel) {
+                            summary.missingChannels++;
+                            continue;
+                        }
 
-            if (panelStatus.recoveredId) {
-                summary.recoveredIds += 1;
-                config.ticketPanelMessageId = panelStatus.recoveredId;
-                await setGuildConfig(client, guild.id, config);
+                        const message = await channel.messages.fetch(panel.messageId).catch(() => null);
+                        if (message) {
+                            summary.healthyPanels++;
+                        } else {
+                            summary.deletedPanels++;
+                        }
+                    } catch (error) {
+                        summary.errors++;
+                    }
+                }
+            } catch (error) {
+                summary.errors++;
+                logger.error(`Error reconciling ticket panels for guild ${guildId}:`, error.message);
             }
-
-            if (panelStatus.exists) {
-                summary.healthyPanels += 1;
-            } else if (panelStatus.reason === 'channel_missing') {
-                summary.missingChannels += 1;
-                logger.warn(`Ticket panel channel missing for guild ${guild.id} (${guild.name})`);
-            } else if (panelStatus.reason === 'panel_deleted') {
-                summary.deletedPanels += 1;
-                logger.warn(
-                    `Ticket panel message deleted for guild ${guild.id} (${guild.name}) — admins can repost from /ticket dashboard`,
-                );
-            }
-        } catch (error) {
-            summary.errors += 1;
-            logger.warn(`Ticket panel health check failed for guild ${guild.id}:`, error.message);
         }
+    } catch (error) {
+        logger.error('Error in reconcileTicketPanels:', error);
     }
 
     return summary;
 }
 
+// ========== VERIFICATION PANELS ==========
 export async function reconcileVerificationPanels(client) {
     const summary = {
         scannedGuilds: 0,
@@ -76,91 +60,45 @@ export async function reconcileVerificationPanels(client) {
         deletedPanels: 0,
         missingChannels: 0,
         recoveredIds: 0,
-        errors: 0,
+        errors: 0
     };
 
-    for (const guild of client.guilds.cache.values()) {
-        summary.scannedGuilds += 1;
+    try {
+        const guilds = client.guilds.cache;
+        summary.scannedGuilds = guilds.size;
 
-        try {
-            const config = await getGuildConfig(client, guild.id);
-            const verification = config?.verification;
-            if (!verification?.channelId || verification.enabled === false) continue;
+        for (const [guildId, guild] of guilds) {
+            try {
+                const key = `verification_panels_${guildId}`;
+                const data = await client.db.get(key);
+                
+                if (!data || !data.panels) continue;
 
-            const panelStatus = await getVerificationPanelStatus(client, guild, verification);
+                for (const panel of data.panels) {
+                    try {
+                        const channel = guild.channels.cache.get(panel.channelId);
+                        if (!channel) {
+                            summary.missingChannels++;
+                            continue;
+                        }
 
-            if (panelStatus.recoveredId) {
-                summary.recoveredIds += 1;
-                await persistVerificationMessageId(client, guild.id, config, panelStatus.recoveredId);
-            }
-
-            if (panelStatus.exists) {
-                summary.healthyPanels += 1;
-            } else if (panelStatus.reason === 'channel_missing') {
-                summary.missingChannels += 1;
-                logger.warn(`Verification panel channel missing for guild ${guild.id} (${guild.name})`);
-            } else if (panelStatus.reason === 'panel_deleted') {
-                summary.deletedPanels += 1;
-                logger.warn(
-                    `Verification panel deleted for guild ${guild.id} (${guild.name}) — repost from /verification dashboard`,
-                );
-            }
-        } catch (error) {
-            summary.errors += 1;
-            logger.warn(`Verification panel health check failed for guild ${guild.id}:`, error.message);
-        }
-    }
-
-    return summary;
-}
-
-export async function reconcileReactionRolePanelHealth(client) {
-    const summary = {
-        scannedGuilds: 0,
-        scannedPanels: 0,
-        healthyPanels: 0,
-        deletedPanels: 0,
-        missingChannels: 0,
-        recoveredIds: 0,
-        errors: 0,
-    };
-
-    for (const guild of client.guilds.cache.values()) {
-        summary.scannedGuilds += 1;
-
-        try {
-            const panels = await getAllReactionRoleMessages(client, guild.id);
-            if (!panels?.length) continue;
-
-            for (const panelData of panels) {
-                if (!panelData?.channelId || !panelData?.messageId) continue;
-                summary.scannedPanels += 1;
-
-                const panelStatus = await getReactionRolePanelStatus(client, guild, panelData);
-
-                if (panelStatus.recoveredId) {
-                    summary.recoveredIds += 1;
-                    await persistReactionRoleMessageId(client, guild.id, panelData, panelStatus.recoveredId);
+                        const message = await channel.messages.fetch(panel.messageId).catch(() => null);
+                        if (message) {
+                            summary.healthyPanels++;
+                        } else {
+                            summary.deletedPanels++;
+                        }
+                    } catch (error) {
+                        summary.errors++;
+                    }
                 }
-
-                if (panelStatus.exists) {
-                    summary.healthyPanels += 1;
-                } else if (panelStatus.reason === 'channel_missing') {
-                    summary.missingChannels += 1;
-                    logger.warn(
-                        `Reaction role panel channel missing for guild ${guild.id}, message ${panelData.messageId}`,
-                    );
-                } else if (panelStatus.reason === 'panel_deleted') {
-                    summary.deletedPanels += 1;
-                    logger.warn(
-                        `Reaction role panel deleted for guild ${guild.id} — repost from /reactroles dashboard`,
-                    );
-                }
+            } catch (error) {
+                summary.errors++;
+                logger.error(`Error reconciling verification panels for guild ${guildId}:`, error.message);
             }
-        } catch (error) {
-            summary.errors += 1;
-            logger.warn(`Reaction role panel health check failed for guild ${guild.id}:`, error.message);
         }
+    } catch (error) {
+        logger.error('Error in reconcileVerificationPanels:', error);
     }
 
     return summary;
