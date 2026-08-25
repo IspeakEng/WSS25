@@ -45,39 +45,21 @@ export default {
             }
 
             // ==========================================
-            // LEAVE EMBED (সব চ্যানেল ফ্যালব্যাক সহ)
+            // LEAVE EMBED (DIRECT CHANNEL ID)
             // ==========================================
 
             try {
-                let leaveChannel = null;
+                // 🔥 সরাসরি তোমার দেওয়া চ্যানেল ID
+                const LEAVE_CHANNEL_ID = '1538786534751211620';
+                const leaveChannel = guild.channels.cache.get(LEAVE_CHANNEL_ID);
 
-                // 1️⃣ ডাটাবেস থেকে চ্যানেল আইডি আনা
-                const leaveChannelId = await getLeaveChannel(member.client, guild.id);
-
-                if (leaveChannelId) {
-                    leaveChannel = guild.channels.cache.get(leaveChannelId);
+                if (!leaveChannel) {
+                    logger.debug(`Leave channel ${LEAVE_CHANNEL_ID} not found in guild ${guild.id}`);
+                    return;
                 }
 
-                // 2️⃣ ডাটাবেসে না থাকলে System Channel ব্যবহার করো
-                if (!leaveChannel) {
-                    leaveChannel = guild.systemChannel;
-                    logger.debug(`Using system channel for leave message in guild ${guild.id}`);
-                }
-
-                // 3️⃣ System Channel না থাকলে General চ্যানেল খোঁজো
-                if (!leaveChannel) {
-                    leaveChannel = guild.channels.cache.find(
-                        (ch) => ch.isTextBased() && 
-                        (ch.name.includes('general') || 
-                         ch.name.includes('chat') || 
-                         ch.name.includes('main'))
-                    );
-                    logger.debug(`Using fallback channel for leave message in guild ${guild.id}`);
-                }
-
-                // 4️⃣ কোনো চ্যানেলই পাওয়া না গেলে Log করো এবং return করো
-                if (!leaveChannel) {
-                    logger.debug(`No suitable channel found for leave message in guild ${guild.id}`);
+                if (!leaveChannel.isTextBased()) {
+                    logger.debug(`Leave channel ${LEAVE_CHANNEL_ID} is not text-based`);
                     return;
                 }
 
