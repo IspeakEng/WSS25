@@ -1,35 +1,11 @@
-// Reaction Role Remove Event - Handles when a user removes a reaction
+// Reaction Role Remove Event - Memory Storage
 
-// ========== IN-MEMORY CACHE ==========
-const roleConfigCache = new Map();
+// ========== MEMORY STORAGE ==========
+const roleConfigs = new Map();
 
-// ========== DATABASE FUNCTIONS ==========
-async function getRoleConfig(messageId, emoji) {
+function getRoleConfig(messageId, emoji) {
     const key = `${messageId}_${emoji}`;
-    
-    if (roleConfigCache.has(key)) {
-        return roleConfigCache.get(key);
-    }
-
-    try {
-        const { db } = await import('../config/database.js');
-        const query = `
-            SELECT message_id, emoji, role_id, guild_id, channel_id
-            FROM reaction_roles
-            WHERE message_id = $1 AND emoji = $2
-        `;
-        const result = await db.query(query, [messageId, emoji]);
-        
-        if (result.rows.length > 0) {
-            const config = result.rows[0];
-            roleConfigCache.set(key, config);
-            return config;
-        }
-        return null;
-    } catch (error) {
-        console.error('❌ Database error in getRoleConfig:', error);
-        return null;
-    }
+    return roleConfigs.get(key) || null;
 }
 
 // ========== MAIN EVENT ==========
@@ -43,7 +19,7 @@ export default {
             if (reaction.partial) await reaction.fetch();
             if (reaction.message.partial) await reaction.message.fetch();
 
-            const config = await getRoleConfig(
+            const config = getRoleConfig(
                 reaction.message.id, 
                 reaction.emoji.name || reaction.emoji.id
             );
