@@ -6,7 +6,7 @@ import {
     updateCounter
 } from '../services/serverstatsService.js';
 import { logger } from '../utils/logger.js';
-import { getLeaveChannel, createLeaveEmbed } from '../services/welcomeLeaveService.js'; // ✅ যোগ করলাম
+import { getLeaveChannel, createLeaveEmbed } from '../services/welcomeLeaveService.js';
 
 export default {
     name: Events.GuildMemberRemove,
@@ -48,7 +48,7 @@ export default {
             }
 
             // ==========================================
-            // LEAVE EMBED (NEW)
+            // LEAVE EMBED (MENTION ❌ - কাজ করে না)
             // ==========================================
 
             try {
@@ -58,7 +58,7 @@ export default {
                     if (leaveChannel?.isTextBased()) {
                         const embed = createLeaveEmbed(member);
                         await leaveChannel.send({
-                            content: `🌙 farewell, ${user.username} ♡`,
+                            content: `🌙 farewell, ${user.username}`, // ❌ Mention করা যায় না, কারণ member চলে গেছে
                             embeds: [embed]
                         });
                     }
