@@ -2,7 +2,7 @@ import {
     SlashCommandBuilder,
     PermissionFlagsBits
 } from 'discord.js';
-import { testWelcome } from '../../services/welcomeLeaveService.js';
+import { createWelcomeEmbed } from '../../services/welcomeLeaveService.js';
 
 const OWNER_ID = '1054967242497982476';
 
@@ -23,14 +23,11 @@ export default {
         try {
             await interaction.deferReply({ ephemeral: true });
 
-            const embed = await testWelcome(
-                interaction.client,
-                interaction.guildId,
-                interaction.user.id
-            );
+            const member = await interaction.guild.members.fetch(interaction.user.id);
+            const embed = createWelcomeEmbed(member);
 
             await interaction.channel.send({
-                content: `🧪 **Welcome Embed Test**`,
+                content: `${member}`, // ✅ মেন্টন কাজ করবে
                 embeds: [embed]
             });
 
