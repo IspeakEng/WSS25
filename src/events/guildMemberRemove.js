@@ -1,24 +1,12 @@
 import { Events } from 'discord.js';
-
-import {
-    getUserApplications,
-    deleteApplication,
-    getGuildBirthdays,
-    deleteBirthday
-} from '../utils/database.js';
-
-import {
-    logEvent,
-    EVENT_TYPES
-} from '../services/loggingService.js';
-
+import { getGuildConfig } from '../services/config/guildConfig.js';
+import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
 import {
     getServerCounters,
     updateCounter
 } from '../services/serverstatsService.js';
-
-import { deleteUserLevelData } from '../services/leveling/leveling.js';
 import { logger } from '../utils/logger.js';
+import { getLeaveChannel, createLeaveEmbed } from '../services/welcomeLeaveService.js'; // ✅ যোগ করলাম
 
 export default {
     name: Events.GuildMemberRemove,
@@ -27,17 +15,6 @@ export default {
     async execute(member) {
         try {
             const { guild, user } = member;
-
-            // ==========================================
-            // GOODBYE SYSTEM
-            // REMOVED
-            // ==========================================
-            //
-            // The old Goodbye system has been removed.
-            // A new Goodbye system will be added later.
-            //
-            // ==========================================
-
 
             // ==========================================
             // MEMBER LEAVE LOG
@@ -53,9 +30,7 @@ export default {
                         lines: [
                             `**User:** ${user.toString()} (${user.tag})`,
                             `**ID:** \`${user.id}\``,
-                            `**Joined:** <t:${Math.floor(
-                                (member.joinedTimestamp || Date.now()) / 1000
-                            )}:R>`,
+                            `**Joined:** <t:${Math.floor(member.joinedTimestamp / 1000)}:R>`,
                             `**Members:** ${guild.memberCount}`
                         ],
                         quoted: false,
@@ -72,6 +47,25 @@ export default {
                 );
             }
 
+            // ==========================================
+            // LEAVE EMBED (NEW)
+            // ==========================================
+
+            try {
+                const leaveChannelId = await getLeaveChannel(member.client, guild.id);
+                if (leaveChannelId) {
+                    const leaveChannel = guild.channels.cache.get(leaveChannelId);
+                    if (leaveChannel?.isTextBased()) {
+                        const embed = createLeaveEmbed(member);
+                        await leaveChannel.send({
+                            content: `🌙 farewell, ${user.username} ♡`,
+                            embeds: [embed]
+                        });
+                    }
+                }
+            } catch (error) {
+                logger.debug('Error sending leave embed:', error);
+            }
 
             // ==========================================
             // SERVER COUNTERS
@@ -100,107 +94,6 @@ export default {
             } catch (error) {
                 logger.debug(
                     'Error updating counters on member leave:',
-                    error
-                );
-            }
-
-
-            // ==========================================
-            // BACKUP BIRTHDAY
-            // ==========================================
-
-            try {
-                const birthdays = await getGuildBirthdays(
-                    member.client,
-                    guild.id
-                );
-
-                if (birthdays[user.id]) {
-                    const backupKey =
-                        `guild:${guild.id}:birthdays:left`;
-
-                    const backup =
-                        (await member.client.db.get(backupKey)) || {};
-
-                    backup[user.id] = birthdays[user.id];
-
-                    await member.client.db.set(
-                        backupKey,
-                        backup
-                    );
-
-                    await deleteBirthday(
-                        member.client,
-                        guild.id,
-                        user.id
-                    );
-
-                    logger.debug(
-                        `Birthday backed up and removed for user ${user.id} in guild ${guild.id}`
-                    );
-                }
-            } catch (error) {
-                logger.debug(
-                    'Error handling birthday on member leave:',
-                    error
-                );
-            }
-
-
-            // ==========================================
-            // REMOVE USER APPLICATIONS
-            // ==========================================
-
-            try {
-                const userApplications =
-                    await getUserApplications(
-                        member.client,
-                        guild.id,
-                        user.id
-                    );
-
-                if (
-                    userApplications &&
-                    userApplications.length > 0
-                ) {
-                    for (const app of userApplications) {
-                        await deleteApplication(
-                            member.client,
-                            guild.id,
-                            app.id,
-                            user.id
-                        );
-                    }
-
-                    logger.debug(
-                        `Removed ${userApplications.length} applications for user ${user.id} in guild ${guild.id}`
-                    );
-                }
-            } catch (error) {
-                logger.debug(
-                    'Error handling applications on member leave:',
-                    error
-                );
-            }
-
-
-            // ==========================================
-            // REMOVE LEVELING DATA
-            // ==========================================
-
-            try {
-                await deleteUserLevelData(
-                    member.client,
-                    guild.id,
-                    user.id
-                );
-
-                logger.debug(
-                    `Removed leveling data for user ${user.id} in guild ${guild.id}`
-                );
-            } catch (error) {
-                logger.debug(
-                    'Error handling leveling data on member leave:',
                     error
                 );
             }
