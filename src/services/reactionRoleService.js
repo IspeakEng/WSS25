@@ -167,71 +167,81 @@ export async function getReactionRoleMessage(client, guildId, messageId) {
     }
 }
 
-export async function createReactionRoleMessage(
-    client,
-    guildId,
-    channelId,
-    messageId,
-    roles = {}
-) {
-    validateGuildId(guildId);
-    validateMessageId(messageId);
+// ========== NEW: GET ROLE CONFIG ==========
+export async function getRoleConfig(client, guildId, messageId, emoji) {
+    try {
+        const data = await getReactionRoleMessage(client, guildId, messageId);
+        
+        if (!data || !data.roles || !data.roles[emoji]) {
+            return null;
+        }
 
-    if (!channelId || !/^\d{17,19}$/.test(channelId)) {
-        throw createError(
-            `Invalid channel ID: ${channelId}`,
-            ErrorTypes.VALIDATION,
-            'Invalid channel ID provided.',
-            { channelId }
-        );
-    }
+        // Check if this role is in an exclusive group
+        let isExclusive = false;
+        let exclusiveGroup = null;
 
-    if (!roles || typeof roles !== 'object' || Array.isArray(roles)) {
-        throw createError(
-            'Invalid roles object',
-            ErrorTypes.VALIDATION,
-            'Reaction roles must be stored as an emoji-to-role mapping.',
-            { roles }
-        );
-    }
-
-    const roleEntries = Object.entries(roles);
-
-    if (roleEntries.length > MAX_ROLES_PER_MESSAGE) {
-        throw createError(
-            `Too many reaction roles: ${roleEntries.length}`,
-            ErrorTypes.VALIDATION,
-            `A message can have a maximum of ${MAX_ROLES_PER_MESSAGE} reaction roles.`,
-            {
-                limit: MAX_ROLES_PER_MESSAGE
+        if (data.exclusiveGroups) {
+            for (const [groupName, roles] of Object.entries(data.exclusiveGroups)) {
+                for (const role of roles) {
+                    if (role.roleId === data.roles[emoji] || role.roleId === data.roles[emoji]) {
+                        isExclusive = true;
+                        exclusiveGroup = groupName;
+                        break;
+                    }
+                }
+                if (isExclusive) break;
             }
-        );
+        }
+
+        return {
+            role_id: data.roles[emoji],
+            is_exclusive: isExclusive,
+            exclusive_group: exclusiveGroup
+        };
+    } catch (error) {
+        logger.error('Error getting role config:', error);
+        return null;
     }
+}
 
-    for (const [, roleId] of roleEntries) {
-        validateRoleId(roleId);
-        await validateRoleSafety(client, guildId, roleId);
+// ========== NEW: GET EXCLUSIVE GROUP ROLES ==========
+export async function getExclusiveGroupRoles(client, guildId, messageId, groupName) {
+    try {
+        const data = await getReactionRoleMessage(client, guildId, messageId);
+        
+        if (!data || !data.exclusiveGroups || !data.exclusiveGroups[groupName]) {
+            return [];
+        }
+
+        return data.exclusiveGroups[groupName];
+    } catch (error) {
+        logger.error('Error getting exclusive group roles:', error);
+        return [];
     }
+}
 
-    const reactionRoleData = {
-        guildId,
-        channelId,
-        messageId,
-        roles,
-        unique: false,
-        exclusiveGroups: {}, // New field for exclusive groups
-        createdAt: new Date().toISOString()
-    };
+// ========== NEW: CHECK IF ROLE IS EXCLUSIVE ==========
+export async function isExclusiveRole(client, guildId, messageId, roleId) {
+    try {
+        const data = await getReactionRoleMessage(client, guildId, messageId);
+        
+        if (!data || !data.exclusiveGroups) {
+            return null;
+        }
 
-    const key = getReactionRoleKey(guildId, messageId);
+        for (const [groupName, roles] of Object.entries(data.exclusiveGroups)) {
+            for (const role of roles) {
+                if (role.roleId === roleId) {
+                    return groupName;
+                }
+            }
+        }
 
-    await client.db.set(key, reactionRoleData);
-
-    logger.info(
-        `Created reaction role message ${messageId} with ${roleEntries.length} roles`
-    );
-
-    return reactionRoleData;
+        return null;
+    } catch (error) {
+        logger.error('Error checking exclusive role:', error);
+        return null;
+    }
 }
 
 // ========== NEW: ADD EXCLUSIVE ROLE ==========
@@ -342,63 +352,74 @@ export async function addExclusiveReactionRole(
     return data;
 }
 
-// ========== NEW: GET EXCLUSIVE GROUP ROLES ==========
-export async function getExclusiveGroupRoles(client, guildId, messageId, groupName) {
-    try {
-        const data = await getReactionRoleMessage(client, guildId, messageId);
-        
-        if (!data || !data.exclusiveGroups || !data.exclusiveGroups[groupName]) {
-            return [];
-        }
+// ========== EXISTING FUNCTIONS ==========
 
-        return data.exclusiveGroups[groupName];
-    } catch (error) {
-        logger.error('Error getting exclusive group roles:', error);
-        return [];
+export async function createReactionRoleMessage(
+    client,
+    guildId,
+    channelId,
+    messageId,
+    roles = {}
+) {
+    validateGuildId(guildId);
+    validateMessageId(messageId);
+
+    if (!channelId || !/^\d{17,19}$/.test(channelId)) {
+        throw createError(
+            `Invalid channel ID: ${channelId}`,
+            ErrorTypes.VALIDATION,
+            'Invalid channel ID provided.',
+            { channelId }
+        );
     }
-}
 
-// ========== NEW: CHECK IF ROLE IS EXCLUSIVE ==========
-export async function isExclusiveRole(client, guildId, messageId, roleId) {
-    try {
-        const data = await getReactionRoleMessage(client, guildId, messageId);
-        
-        if (!data || !data.exclusiveGroups) {
-            return null;
-        }
+    if (!roles || typeof roles !== 'object' || Array.isArray(roles)) {
+        throw createError(
+            'Invalid roles object',
+            ErrorTypes.VALIDATION,
+            'Reaction roles must be stored as an emoji-to-role mapping.',
+            { roles }
+        );
+    }
 
-        for (const [groupName, roles] of Object.entries(data.exclusiveGroups)) {
-            for (const role of roles) {
-                if (role.roleId === roleId) {
-                    return groupName;
-                }
+    const roleEntries = Object.entries(roles);
+
+    if (roleEntries.length > MAX_ROLES_PER_MESSAGE) {
+        throw createError(
+            `Too many reaction roles: ${roleEntries.length}`,
+            ErrorTypes.VALIDATION,
+            `A message can have a maximum of ${MAX_ROLES_PER_MESSAGE} reaction roles.`,
+            {
+                limit: MAX_ROLES_PER_MESSAGE
             }
-        }
-
-        return null;
-    } catch (error) {
-        logger.error('Error checking exclusive role:', error);
-        return null;
+        );
     }
-}
 
-// ========== NEW: GET ALL EXCLUSIVE GROUPS ==========
-export async function getAllExclusiveGroups(client, guildId, messageId) {
-    try {
-        const data = await getReactionRoleMessage(client, guildId, messageId);
-        
-        if (!data || !data.exclusiveGroups) {
-            return {};
-        }
-
-        return data.exclusiveGroups;
-    } catch (error) {
-        logger.error('Error getting exclusive groups:', error);
-        return {};
+    for (const [, roleId] of roleEntries) {
+        validateRoleId(roleId);
+        await validateRoleSafety(client, guildId, roleId);
     }
-}
 
-// ========== EXISTING FUNCTIONS (Unchanged) ==========
+    const reactionRoleData = {
+        guildId,
+        channelId,
+        messageId,
+        roles,
+        unique: false,
+        exclusiveGroups: {},
+        createdAt: new Date().toISOString()
+    };
+
+    const key = getReactionRoleKey(guildId, messageId);
+
+    await client.db.set(key, reactionRoleData);
+
+    logger.info(
+        `Created reaction role message ${messageId} with ${roleEntries.length} roles`
+    );
+
+    return reactionRoleData;
+}
 
 export async function addReactionRole(
     client,
