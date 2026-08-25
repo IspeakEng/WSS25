@@ -2,7 +2,7 @@ import {
     SlashCommandBuilder,
     PermissionFlagsBits
 } from 'discord.js';
-import { testLeave } from '../../services/welcomeLeaveService.js';
+import { createLeaveEmbed } from '../../services/welcomeLeaveService.js';
 
 const OWNER_ID = '1054967242497982476';
 
@@ -23,14 +23,11 @@ export default {
         try {
             await interaction.deferReply({ ephemeral: true });
 
-            const embed = await testLeave(
-                interaction.client,
-                interaction.guildId,
-                interaction.user.id
-            );
+            const member = await interaction.guild.members.fetch(interaction.user.id);
+            const embed = createLeaveEmbed(member);
 
             await interaction.channel.send({
-                content: `🧪 **Leave Embed Test**`,
+                content: `${member}`, // ✅ মেন্টন কাজ করবে (টেস্টের জন্য)
                 embeds: [embed]
             });
 
