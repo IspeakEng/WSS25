@@ -9,13 +9,12 @@ const OWNER_ID = '1054967242497982476';
 export default {
     data: new SlashCommandBuilder()
         .setName('send')
-        .setDescription('Send a file, image, video, GIF, or sticker')
+        .setDescription('Send a message, file, image, video, GIF, or sticker')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 
         // ==========================================
         // TARGET SERVER (Optional)
         // ==========================================
-
         .addStringOption(option =>
             option
                 .setName('server_id')
@@ -26,7 +25,6 @@ export default {
         // ==========================================
         // TARGET CHANNEL (Optional)
         // ==========================================
-
         .addStringOption(option =>
             option
                 .setName('channel_id')
@@ -35,9 +33,18 @@ export default {
         )
 
         // ==========================================
-        // FILE UPLOAD
+        // NORMAL MESSAGE (Optional)
         // ==========================================
+        .addStringOption(option =>
+            option
+                .setName('message')
+                .setDescription('Normal message to send')
+                .setRequired(false)
+        )
 
+        // ==========================================
+        // FILE UPLOAD (Optional)
+        // ==========================================
         .addAttachmentOption(option =>
             option
                 .setName('file')
@@ -46,9 +53,8 @@ export default {
         )
 
         // ==========================================
-        // STICKER
+        // STICKER (Optional)
         // ==========================================
-
         .addStringOption(option =>
             option
                 .setName('sticker_id')
@@ -61,19 +67,18 @@ export default {
             // ==========================================
             // GET OPTIONS
             // ==========================================
-
             const serverId = interaction.options.getString('server_id');
             const channelId = interaction.options.getString('channel_id');
+            const message = interaction.options.getString('message');
             const file = interaction.options.getAttachment('file');
             const stickerId = interaction.options.getString('sticker_id');
 
             // ==========================================
             // CHECK IF SOMETHING WAS PROVIDED
             // ==========================================
-
-            if (!file && !stickerId) {
+            if (!message && !file && !stickerId) {
                 return interaction.reply({
-                    content: '❌ Please provide a file or sticker to send.',
+                    content: '❌ Please provide a message, file, or sticker to send.',
                     ephemeral: true
                 });
             }
@@ -81,7 +86,6 @@ export default {
             // ==========================================
             // DETERMINE TARGET SERVER
             // ==========================================
-
             let targetGuild;
 
             if (serverId) {
@@ -103,9 +107,8 @@ export default {
             }
 
             // ==========================================
-            // PERMISSION CHECK
+            // PERMISSION CHECK (Owner or Server Owner)
             // ==========================================
-
             const isBotOwner = interaction.user.id === OWNER_ID;
             const isTargetServerOwner = interaction.user.id === targetGuild.ownerId;
 
@@ -119,7 +122,6 @@ export default {
             // ==========================================
             // DETERMINE TARGET CHANNEL
             // ==========================================
-
             let targetChannel;
 
             if (channelId) {
@@ -137,31 +139,24 @@ export default {
                         ephemeral: true
                     });
                 }
-
                 if (!interaction.guild || interaction.guild.id !== targetGuild.id) {
                     return interaction.reply({
                         content: '❌ When sending to another server, you must provide a channel_id.',
                         ephemeral: true
                     });
                 }
-
                 targetChannel = interaction.channel;
             }
 
             // ==========================================
-            // CHECK TEXT CHANNEL
+            // CHECK TEXT CHANNEL & PERMISSIONS
             // ==========================================
-
             if (!targetChannel.isTextBased()) {
                 return interaction.reply({
                     content: '❌ That channel cannot receive messages.',
                     ephemeral: true
                 });
             }
-
-            // ==========================================
-            // CHECK BOT PERMISSIONS
-            // ==========================================
 
             const botMember = await targetGuild.members.fetchMe();
             const permissions = targetChannel.permissionsFor(botMember);
@@ -172,7 +167,6 @@ export default {
                     ephemeral: true
                 });
             }
-
             if (file && !permissions?.has('AttachFiles')) {
                 return interaction.reply({
                     content: '❌ I do not have **Attach Files** permission in that channel.',
@@ -181,27 +175,22 @@ export default {
             }
 
             // ==========================================
-            // DEFER
+            // DEFER REPLY
             // ==========================================
-
             await interaction.deferReply({ ephemeral: true });
 
             // ==========================================
-            // TYPING
+            // TYPING INDICATOR
             // ==========================================
-
             await targetChannel.sendTyping();
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // ==========================================
-            // CREATE PAYLOAD
+            // BUILD PAYLOAD
             // ==========================================
-
             const payload = {};
 
-            // ==========================================
-            // FILE
-            // ==========================================
+            if (message) payload.content = message;
 
             if (file) {
                 payload.files = [
@@ -210,10 +199,6 @@ export default {
                     })
                 ];
             }
-
-            // ==========================================
-            // STICKER
-            // ==========================================
 
             if (stickerId) {
                 try {
@@ -233,30 +218,28 @@ export default {
             }
 
             // ==========================================
-            // SEND
+            // SEND MESSAGE
             // ==========================================
-
             const sentMessage = await targetChannel.send(payload);
 
             // ==========================================
-            // SUCCESS
+            // SUCCESS REPLY
             // ==========================================
+            let replyMessage =
+                `✅ **Message sent successfully!**\n\n` +
+                `**Server:** ${targetGuild.name}\n` +
+                `**Channel:** ${targetChannel}\n` +
+                `**Message ID:** \`${sentMessage.id}\``;
 
-            await interaction.editReply({
-                content:
-                    `✅ **Message sent successfully!**\n\n` +
-                    `**Server:** ${targetGuild.name}\n` +
-                    `**Channel:** ${targetChannel}\n` +
-                    `**Message ID:** \`${sentMessage.id}\`\n` +
-                    `${file ? `**File:** ${file.name}` : ''}\n` +
-                    `${stickerId ? `**Sticker:** ${stickerId}` : ''}`
-            });
+            if (message) replyMessage += `\n**Content:** ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`;
+            if (file) replyMessage += `\n**File:** ${file.name}`;
+            if (stickerId) replyMessage += `\n**Sticker:** ${stickerId}`;
+
+            await interaction.editReply({ content: replyMessage });
 
         } catch (error) {
             console.error('Send command error:', error);
-
             const errorMessage = '❌ Failed to send the message. Check the Server ID, Channel ID, and bot permissions.';
-
             if (interaction.deferred || interaction.replied) {
                 await interaction.editReply({ content: errorMessage }).catch(() => {});
             } else {
