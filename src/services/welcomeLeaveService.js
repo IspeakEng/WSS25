@@ -29,14 +29,18 @@ export async function getLeaveChannel(client, guildId) {
 }
 
 // ========================================
-// Welcome Embed
+// BANNER URL (তোমার দেওয়া)
+// ========================================
+
+const BANNER_URL = 'https://media.discordapp.net/attachments/1527750801462657095/1528001749179306034/server_er_banner.png?ex=6a8ecf05&is=6a8d7d85&hm=82cfdde9ca5670f2bac19279dbbd832088f07bb18d4e4096e2e46e7c35b1d581&=&format=webp&quality=lossless&width=1398&height=559';
+
+// ========================================
+// WELCOME EMBED
 // ========================================
 
 export function createWelcomeEmbed(member) {
     const guild = member.guild;
     const user = member.user;
-
-    const bannerURL = 'https://media.discordapp.net/attachments/1527750801462657095/1528001749179306034/server_er_banner.png?ex=6a8ecf05&is=6a8d7d85&hm=82cfdde9ca5670f2bac19279dbbd832088f07bb18d4e4096e2e46e7c35b1d581&=&format=webp&quality=lossless&width=1398&height=559';
 
     const embed = new EmbedBuilder()
         .setColor('#FFB6C1')
@@ -47,7 +51,7 @@ export function createWelcomeEmbed(member) {
             `▸ ˚₊‧⁺˖ enjoy your stay ♡`
         )
         .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setImage(bannerURL)
+        .setImage(BANNER_URL)   // ✅ Banner এখানে
         .setFooter({
             text: `₊˚.⋆ ☾ ${guild.name}`,
             iconURL: guild.iconURL({ dynamic: true })
@@ -58,14 +62,12 @@ export function createWelcomeEmbed(member) {
 }
 
 // ========================================
-// Leave Embed
+// LEAVE EMBED
 // ========================================
 
 export function createLeaveEmbed(member) {
     const guild = member.guild;
     const user = member.user;
-
-    const bannerURL = 'https://media.discordapp.net/attachments/1527750801462657095/1528001749179306034/server_er_banner.png?ex=6a8ecf05&is=6a8d7d85&hm=82cfdde9ca5670f2bac19279dbbd832088f07bb18d4e4096e2e46e7c35b1d581&=&format=webp&quality=lossless&width=1398&height=559';
 
     const embed = new EmbedBuilder()
         .setColor('#D8B4FE')
@@ -76,7 +78,7 @@ export function createLeaveEmbed(member) {
             `▸ ˚₊‧⁺˖ farewell, space cowboy ♡`
         )
         .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setImage(bannerURL)
+        .setImage(BANNER_URL)   // ✅ Banner এখানেও
         .setFooter({
             text: `₊˚.⋆ ☾ ${guild.name}`,
             iconURL: guild.iconURL({ dynamic: true })
