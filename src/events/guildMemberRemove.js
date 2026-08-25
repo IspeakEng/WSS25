@@ -41,39 +41,57 @@ export default {
                     }
                 });
             } catch (error) {
-                logger.debug(
-                    'Error logging member leave:',
-                    error
-                );
+                logger.debug('Error logging member leave:', error);
             }
 
             // ==========================================
-            // LEAVE EMBED
+            // LEAVE EMBED (সব চ্যানেল ফ্যালব্যাক সহ)
             // ==========================================
 
             try {
+                let leaveChannel = null;
+
+                // 1️⃣ ডাটাবেস থেকে চ্যানেল আইডি আনা
                 const leaveChannelId = await getLeaveChannel(member.client, guild.id);
-                
+
                 if (leaveChannelId) {
-                    const leaveChannel = guild.channels.cache.get(leaveChannelId);
-                    
-                    if (leaveChannel?.isTextBased()) {
-                        // ✅ Leave এম্বেড তৈরি করো
-                        const embed = createLeaveEmbed(member);
-                        
-                        // ✅ লিভ চ্যানেলে পাঠাও
-                        await leaveChannel.send({
-                            content: `🌙 farewell, ${user.username} ♡`,
-                            embeds: [embed]
-                        });
-                    } else {
-                        logger.debug(`Leave channel ${leaveChannelId} not found or not text-based`);
-                    }
-                } else {
-                    logger.debug(`No leave channel set for guild ${guild.id}`);
+                    leaveChannel = guild.channels.cache.get(leaveChannelId);
                 }
+
+                // 2️⃣ ডাটাবেসে না থাকলে System Channel ব্যবহার করো
+                if (!leaveChannel) {
+                    leaveChannel = guild.systemChannel;
+                    logger.debug(`Using system channel for leave message in guild ${guild.id}`);
+                }
+
+                // 3️⃣ System Channel না থাকলে General চ্যানেল খোঁজো
+                if (!leaveChannel) {
+                    leaveChannel = guild.channels.cache.find(
+                        (ch) => ch.isTextBased() && 
+                        (ch.name.includes('general') || 
+                         ch.name.includes('chat') || 
+                         ch.name.includes('main'))
+                    );
+                    logger.debug(`Using fallback channel for leave message in guild ${guild.id}`);
+                }
+
+                // 4️⃣ কোনো চ্যানেলই পাওয়া না গেলে Log করো এবং return করো
+                if (!leaveChannel) {
+                    logger.debug(`No suitable channel found for leave message in guild ${guild.id}`);
+                    return;
+                }
+
+                // ✅ Leave এম্বেড তৈরি করো
+                const embed = createLeaveEmbed(member);
+
+                // ✅ লিভ চ্যানেলে পাঠাও
+                await leaveChannel.send({
+                    content: `🌙 farewell, ${user.username} ♡`,
+                    embeds: [embed]
+                });
+
             } catch (error) {
-                logger.debug('Error sending leave embed:', error);
+                logger.error('Error sending leave embed:', error);
             }
 
             // ==========================================
@@ -81,37 +99,18 @@ export default {
             // ==========================================
 
             try {
-                const counters = await getServerCounters(
-                    member.client,
-                    guild.id
-                );
-
+                const counters = await getServerCounters(member.client, guild.id);
                 for (const counter of counters) {
-                    if (
-                        counter &&
-                        counter.type &&
-                        counter.channelId &&
-                        counter.enabled !== false
-                    ) {
-                        await updateCounter(
-                            member.client,
-                            guild,
-                            counter
-                        );
+                    if (counter?.type && counter?.channelId && counter.enabled !== false) {
+                        await updateCounter(member.client, guild, counter);
                     }
                 }
             } catch (error) {
-                logger.debug(
-                    'Error updating counters on member leave:',
-                    error
-                );
+                logger.debug('Error updating counters on member leave:', error);
             }
 
         } catch (error) {
-            logger.error(
-                'Error in guildMemberRemove event:',
-                error
-            );
+            logger.error('Error in guildMemberRemove event:', error);
         }
     }
 };
