@@ -33,7 +33,7 @@ export default {
         )
 
         // ==========================================
-        // NORMAL MESSAGE (Optional)
+        // MESSAGE (Optional)
         // ==========================================
         .addStringOption(option =>
             option
@@ -43,7 +43,7 @@ export default {
         )
 
         // ==========================================
-        // FILE UPLOAD (Optional)
+        // FILE (Optional)
         // ==========================================
         .addAttachmentOption(option =>
             option
@@ -107,7 +107,7 @@ export default {
             }
 
             // ==========================================
-            // PERMISSION CHECK (Owner or Server Owner)
+            // PERMISSION CHECK
             // ==========================================
             const isBotOwner = interaction.user.id === OWNER_ID;
             const isTargetServerOwner = interaction.user.id === targetGuild.ownerId;
