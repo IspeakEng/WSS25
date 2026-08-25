@@ -48,20 +48,29 @@ export default {
             }
 
             // ==========================================
-            // LEAVE EMBED (MENTION ❌ - কাজ করে না)
+            // LEAVE EMBED
             // ==========================================
 
             try {
                 const leaveChannelId = await getLeaveChannel(member.client, guild.id);
+                
                 if (leaveChannelId) {
                     const leaveChannel = guild.channels.cache.get(leaveChannelId);
+                    
                     if (leaveChannel?.isTextBased()) {
+                        // ✅ Leave এম্বেড তৈরি করো
                         const embed = createLeaveEmbed(member);
+                        
+                        // ✅ লিভ চ্যানেলে পাঠাও
                         await leaveChannel.send({
-                            content: `🌙 farewell, ${user.username}`, // ❌ Mention করা যায় না, কারণ member চলে গেছে
+                            content: `🌙 farewell, ${user.username} ♡`,
                             embeds: [embed]
                         });
+                    } else {
+                        logger.debug(`Leave channel ${leaveChannelId} not found or not text-based`);
                     }
+                } else {
+                    logger.debug(`No leave channel set for guild ${guild.id}`);
                 }
             } catch (error) {
                 logger.debug('Error sending leave embed:', error);
