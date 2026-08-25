@@ -7,7 +7,7 @@ import {
 } from '../services/serverstatsService.js';
 import { setBirthday as dbSetBirthday } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
-import { getWelcomeChannel, createWelcomeEmbed } from '../services/welcomeLeaveService.js'; // ✅ যোগ করলাম
+import { getWelcomeChannel, createWelcomeEmbed } from '../services/welcomeLeaveService.js';
 
 export default {
     name: Events.GuildMemberAdd,
@@ -103,7 +103,7 @@ export default {
             }
 
             // ==========================================
-            // WELCOME EMBED (NEW)
+            // WELCOME EMBED (MENTION ✅)
             // ==========================================
 
             try {
@@ -113,7 +113,7 @@ export default {
                     if (welcomeChannel?.isTextBased()) {
                         const embed = createWelcomeEmbed(member);
                         await welcomeChannel.send({
-                            content: `☁️ welcome, ${member} ♡`,
+                            content: `☁️ welcome, ${member}`, // ✅ মেন্টন কাজ করবে
                             embeds: [embed]
                         });
                     }
