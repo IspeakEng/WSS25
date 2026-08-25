@@ -1,105 +1,93 @@
-import { EmbedBuilder } from 'discord.js';
+import { Events } from 'discord.js';
+import { getGuildConfig } from '../services/config/guildConfig.js';
+import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
+import {
+    getServerCounters,
+    updateCounter
+} from '../services/serverstatsService.js';
+import { logger } from '../utils/logger.js';
+import { getLeaveChannel, createLeaveEmbed } from '../services/welcomeLeaveService.js';
 
-// ========================================
-// Database Functions
-// ========================================
+export default {
+    name: Events.GuildMemberRemove,
+    once: false,
 
-export async function setWelcomeChannel(client, guildId, channelId) {
-    const key = `welcome_${guildId}`;
-    await client.db.set(key, { channelId });
-    return true;
-}
+    async execute(member) {
+        try {
+            const { guild, user } = member;
 
-export async function setLeaveChannel(client, guildId, channelId) {
-    const key = `leave_${guildId}`;
-    await client.db.set(key, { channelId });
-    return true;
-}
+            // ==========================================
+            // MEMBER LEAVE LOG
+            // ==========================================
 
-export async function getWelcomeChannel(client, guildId) {
-    const key = `welcome_${guildId}`;
-    const data = await client.db.get(key);
-    return data?.channelId || null;
-}
+            try {
+                await logEvent({
+                    client: member.client,
+                    guildId: guild.id,
+                    eventType: EVENT_TYPES.MEMBER_LEAVE,
+                    data: {
+                        title: 'User left',
+                        lines: [
+                            `**User:** ${user.toString()} (${user.tag})`,
+                            `**ID:** \`${user.id}\``,
+                            `**Joined:** <t:${Math.floor(member.joinedTimestamp / 1000)}:R>`,
+                            `**Members:** ${guild.memberCount}`
+                        ],
+                        quoted: false,
+                        thumbnail: user.displayAvatarURL({
+                            dynamic: true
+                        }),
+                        userId: user.id
+                    }
+                });
+            } catch (error) {
+                logger.debug('Error logging member leave:', error);
+            }
 
-export async function getLeaveChannel(client, guildId) {
-    const key = `leave_${guildId}`;
-    const data = await client.db.get(key);
-    return data?.channelId || null;
-}
+            // ==========================================
+            // LEAVE EMBED (ডাটাবেস থেকে চ্যানেল আইডি নিয়ে)
+            // ==========================================
 
-// ========================================
-// BANNER URL
-// ========================================
+            try {
+                const leaveChannelId = await getLeaveChannel(member.client, guild.id);
+                
+                if (leaveChannelId) {
+                    const leaveChannel = guild.channels.cache.get(leaveChannelId);
+                    
+                    if (leaveChannel?.isTextBased()) {
+                        const embed = createLeaveEmbed(member);
+                        await leaveChannel.send({
+                            content: `🌙 farewell, ${user.username} ♡`,
+                            embeds: [embed]
+                        });
+                    } else {
+                        logger.debug(`Leave channel ${leaveChannelId} not found or not text-based in guild ${guild.id}`);
+                    }
+                } else {
+                    logger.debug(`No leave channel set for guild ${guild.id}`);
+                }
 
-const BANNER_URL = 'https://media.discordapp.net/attachments/1527750801462657095/1528001749179306034/server_er_banner.png?ex=6a8ecf05&is=6a8d7d85&hm=82cfdde9ca5670f2bac19279dbbd832088f07bb18d4e4096e2e46e7c35b1d581&=&format=webp&quality=lossless&width=1398&height=559';
+            } catch (error) {
+                logger.error('Error sending leave embed:', error);
+            }
 
-// ========================================
-// Welcome Embed
-// ========================================
+            // ==========================================
+            // SERVER COUNTERS
+            // ==========================================
 
-export function createWelcomeEmbed(member) {
-    const guild = member.guild;
-    const user = member.user;
+            try {
+                const counters = await getServerCounters(member.client, guild.id);
+                for (const counter of counters) {
+                    if (counter?.type && counter?.channelId && counter.enabled !== false) {
+                        await updateCounter(member.client, guild, counter);
+                    }
+                }
+            } catch (error) {
+                logger.debug('Error updating counters on member leave:', error);
+            }
 
-    const embed = new EmbedBuilder()
-        .setColor('#FFB6C1')
-        .setTitle(`☁️ welcome, ${user.username}`)
-        .setDescription(
-            `▸ ✦ ${guild.name} ✦\n` +
-            `▸ ✧ member #${guild.memberCount}\n` +
-            `▸ ˚₊‧⁺˖ enjoy your stay ♡`
-        )
-        .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setImage(BANNER_URL)   // ✅ Banner এখানে বসেছে
-        .setFooter({
-            text: `₊˚.⋆ ☾ ${guild.name}`,
-            iconURL: guild.iconURL({ dynamic: true })
-        })
-        .setTimestamp();
-
-    return embed;
-}
-
-// ========================================
-// Leave Embed
-// ========================================
-
-export function createLeaveEmbed(member) {
-    const guild = member.guild;
-    const user = member.user;
-
-    const embed = new EmbedBuilder()
-        .setColor('#D8B4FE')
-        .setTitle(`🌙 ${user.username} left`)
-        .setDescription(
-            `▸ ✦ ${guild.name} ✦\n` +
-            `▸ ✧ ${guild.memberCount} remain\n` +
-            `▸ ˚₊‧⁺˖ farewell, space cowboy ♡`
-        )
-        .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
-        .setImage(BANNER_URL)   // ✅ Banner এখানেও বসেছে
-        .setFooter({
-            text: `₊˚.⋆ ☾ ${guild.name}`,
-            iconURL: guild.iconURL({ dynamic: true })
-        })
-        .setTimestamp();
-
-    return embed;
-}
-
-// ========================================
-// Test Functions
-// ========================================
-
-export async function testWelcome(client, guildId, userId) {
-    const guild = await client.guilds.fetch(guildId);
-    const member = await guild.members.fetch(userId);
-    return createWelcomeEmbed(member);
-}
-
-export async function testLeave(client, guildId, userId) {
-    const guild = await client.guilds.fetch(guildId);
-    const member = await guild.members.fetch(userId);
-    return createLeaveEmbed(member);
-}
+        } catch (error) {
+            logger.error('Error in guildMemberRemove event:', error);
+        }
+    }
+};
