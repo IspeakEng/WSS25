@@ -7,6 +7,7 @@ import {
 } from '../services/serverstatsService.js';
 import { setBirthday as dbSetBirthday } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
+import { getWelcomeChannel, createWelcomeEmbed } from '../services/welcomeLeaveService.js'; // ✅ যোগ করলাম
 
 export default {
     name: Events.GuildMemberAdd,
@@ -99,6 +100,26 @@ export default {
                     'Error logging member join:',
                     error
                 );
+            }
+
+            // ==========================================
+            // WELCOME EMBED (NEW)
+            // ==========================================
+
+            try {
+                const welcomeChannelId = await getWelcomeChannel(member.client, guild.id);
+                if (welcomeChannelId) {
+                    const welcomeChannel = guild.channels.cache.get(welcomeChannelId);
+                    if (welcomeChannel?.isTextBased()) {
+                        const embed = createWelcomeEmbed(member);
+                        await welcomeChannel.send({
+                            content: `☁️ welcome, ${member} ♡`,
+                            embeds: [embed]
+                        });
+                    }
+                }
+            } catch (error) {
+                logger.debug('Error sending welcome embed:', error);
             }
 
             // ==========================================
