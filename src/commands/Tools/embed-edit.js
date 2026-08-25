@@ -6,6 +6,7 @@ import {
     TextInputStyle,
     ActionRowBuilder
 } from 'discord.js';
+import embedEditModal from '../../handlers/interactionHandlers/embedEditModal.js';
 
 const OWNER_ID = '1054967242497982476';
 
@@ -27,27 +28,13 @@ export default {
         ),
 
     async execute(interaction) {
-        // ==========================================
-        // REGISTER MODAL HANDLER
-        // ==========================================
+        // Register modal handler
         if (!interaction.client.modals.has('embed_edit')) {
-            const modalHandler = await import('../../handlers/interactionHandlers/embedEditModal.js');
-            interaction.client.modals.set('embed_edit', modalHandler.default);
+            interaction.client.modals.set('embed_edit', embedEditModal);
             console.log('✅ Registered embed_edit modal handler');
         }
 
-        // ==========================================
-        // REGISTER BUTTON HANDLER
-        // ==========================================
-        if (!interaction.client.buttons.has('embed_edit_button')) {
-            const buttonHandler = await import('../../handlers/interactionHandlers/embedEditButton.js');
-            interaction.client.buttons.set('embed_edit_button', buttonHandler.default);
-            console.log('✅ Registered embed_edit_button handler');
-        }
-
-        // ==========================================
-        // OWNER CHECK
-        // ==========================================
+        // Owner check
         if (interaction.user.id !== OWNER_ID) {
             return interaction.reply({
                 content: '❌ Only the bot owner can use this command.',
@@ -55,9 +42,6 @@ export default {
             });
         }
 
-        // ==========================================
-        // GET OPTIONS
-        // ==========================================
         const messageId = interaction.options.getString('message_id');
         const channelId = interaction.options.getString('channel_id');
 
@@ -82,9 +66,6 @@ export default {
                 targetChannel = interaction.channel;
             }
 
-            // ==========================================
-            // FETCH MESSAGE
-            // ==========================================
             const message = await targetChannel.messages.fetch(messageId);
             
             if (message.author.id !== interaction.client.user.id) {
@@ -101,9 +82,6 @@ export default {
                 });
             }
 
-            // ==========================================
-            // GET CURRENT EMBED VALUES
-            // ==========================================
             const currentEmbed = message.embeds[0];
             const currentTitle = currentEmbed.title || '';
             const currentDescription = currentEmbed.description || '';
@@ -112,9 +90,7 @@ export default {
             const currentImage = currentEmbed.image?.url || '';
             const currentThumbnail = currentEmbed.thumbnail?.url || '';
 
-            // ==========================================
-            // CREATE MODAL
-            // ==========================================
+            // Create modal
             const modal = new ModalBuilder()
                 .setCustomId(`embed_edit:${message.id}:${targetChannel.id}`)
                 .setTitle('Edit Embed');
@@ -165,7 +141,7 @@ export default {
             await interaction.showModal(modal);
 
         } catch (error) {
-            console.error('❌ Embed edit command error:', error);
+            console.error('Embed edit command error:', error);
             
             if (error.code === 10008) {
                 return interaction.reply({
