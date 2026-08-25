@@ -103,7 +103,7 @@ export default {
             }
 
             // ==========================================
-            // WELCOME EMBED (MENTION ✅)
+            // WELCOME EMBED (IMMEDIATE)
             // ==========================================
 
             try {
@@ -113,7 +113,7 @@ export default {
                     if (welcomeChannel?.isTextBased()) {
                         const embed = createWelcomeEmbed(member);
                         await welcomeChannel.send({
-                            content: `☁️ welcome, ${member}`, // ✅ মেন্টন কাজ করবে
+                            content: `☁️ welcome, ${member}`,
                             embeds: [embed]
                         });
                     }
@@ -121,6 +121,50 @@ export default {
             } catch (error) {
                 logger.debug('Error sending welcome embed:', error);
             }
+
+            // ============================================================
+            // 30 SECONDS LATER – CUTE FOLLOW-UP (EMBED ছাড়া)
+            // ============================================================
+
+            setTimeout(async () => {
+                try {
+                    // Find a general channel
+                    let generalChannel = guild.channels.cache.find(
+                        (ch) => ch.isTextBased() && 
+                        (ch.name.includes('general') || 
+                         ch.name.includes('chat') || 
+                         ch.name.includes('main'))
+                    );
+
+                    if (!generalChannel) {
+                        generalChannel = guild.systemChannel || guild.channels.cache.find(ch => ch.isTextBased());
+                    }
+
+                    if (!generalChannel) return;
+
+                    // ✅ তোমার দেওয়া channel IDs
+                    const ROLES_CHANNEL_ID = '1527205606396661780';
+                    const RULES_CHANNEL_ID = '1527205591162814615';
+
+                    const rolesChannel = guild.channels.cache.get(ROLES_CHANNEL_ID);
+                    const rulesChannel = guild.channels.cache.get(RULES_CHANNEL_ID);
+
+                    const rolesMention = rolesChannel ? `<#${ROLES_CHANNEL_ID}>` : '`#roles`';
+                    const rulesMention = rulesChannel ? `<#${RULES_CHANNEL_ID}>` : '`#rules`';
+
+                    await generalChannel.send(
+                        `✨ hey ${member}, welcome again! ✨\n\n` +
+                        `we're so glad you're here ♡\n\n` +
+                        `• head over to ${rolesMention} to pick your roles\n` +
+                        `• take a quick peek at ${rulesMention} to stay in the loop\n\n` +
+                        `we want you to feel right at home.\n` +
+                        `if you need anything, just ping us. enjoy your stay! ₊˚⊹♡`
+                    );
+
+                } catch (error) {
+                    logger.debug('Error sending follow-up welcome message:', error);
+                }
+            }, 30000); // ⏱️ 30 seconds
 
             // ==========================================
             // SERVER COUNTERS
