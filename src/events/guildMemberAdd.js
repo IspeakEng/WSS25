@@ -128,11 +128,13 @@ export default {
 
             setTimeout(async () => {
                 try {
+                    // ✅ সরাসরি general চ্যানেল আইডি
                     const GENERAL_CHANNEL_ID = '1534104536879206412';
                     const generalChannel = guild.channels.cache.get(GENERAL_CHANNEL_ID);
 
                     if (!generalChannel) return;
 
+                    // ✅ তোমার দেওয়া channel IDs
                     const ROLES_CHANNEL_ID = '1527205606396661780';
                     const RULES_CHANNEL_ID = '1527205591162814615';
 
