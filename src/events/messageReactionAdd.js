@@ -1,43 +1,66 @@
-module.exports = {
-    name: 'messageReactionAdd',
-    async execute(reaction, user) {
-        // বটের নিজের রিয়্যাকশন ইগনোর
-        if (user.bot) return;
+// Reaction Role Add Event - Handles when a user adds a reaction
+import { getRoleConfig, getExclusiveGroup } from '../services/reactionRoleService.js';
 
-        // পার্শিয়াল ডাটা ফেচ করুন
+export const name = 'messageReactionAdd';
+
+export async function execute(reaction, user) {
+    // Ignore bot's own reactions
+    if (user.bot) return;
+
+    try {
+        // Fetch partial data if needed
         if (reaction.partial) await reaction.fetch();
         if (reaction.message.partial) await reaction.message.fetch();
 
-        // আপনার রোল কনফিগ এখানে লোড করুন
-        // (আপনার ডাটাবেস বা ম্যাপ থেকে)
-        const roleConfig = await getRoleConfig(reaction.message.id, reaction.emoji.name);
-        if (!roleConfig) return;
+        // Get role configuration for this reaction
+        const config = await getRoleConfig(reaction.message.id, reaction.emoji.name || reaction.emoji.id);
+        if (!config) return;
 
         const member = await reaction.message.guild.members.fetch(user.id);
-        const role = reaction.message.guild.roles.cache.get(roleConfig.roleId);
-        if (!role) return;
+        const role = reaction.message.guild.roles.cache.get(config.roleId);
+        if (!role) {
+            console.log(`❌ Role ${config.roleId} not found`);
+            return;
+        }
 
-        // ========== টগল লজিক ==========
+        // ========== TOGGLE LOGIC ==========
         if (member.roles.cache.has(role.id)) {
-            // রোল থাকলে রিমুভ করো
+            // Remove role if user already has it (toggle off)
             await member.roles.remove(role);
-            console.log(`❌ ${user.tag} থেকে ${role.name} রিমুভ করা হলো`);
+            console.log(`❌ Removed ${role.name} from ${user.tag}`);
+            
+            // Send feedback if needed
+            try {
+                await user.send(`❌ Removed **${role.name}** role from you`);
+            } catch (e) {
+                // User has DMs disabled
+            }
         } else {
-            // ========== এক্সক্লুসিভ লজিক ==========
-            // এই গ্রুপের অন্য রোলগুলো রিমুভ করো
+            // ========== EXCLUSIVE LOGIC ==========
+            // Check if this role belongs to an exclusive group
             const exclusiveGroup = getExclusiveGroup(role.id);
             if (exclusiveGroup) {
+                // Remove all other roles from the same group
                 for (const otherRoleId of exclusiveGroup) {
                     if (otherRoleId !== role.id && member.roles.cache.has(otherRoleId)) {
                         await member.roles.remove(otherRoleId);
-                        console.log(`❌ পুরোনো রোল রিমুভ করা হলো: ${otherRoleId}`);
+                        console.log(`❌ Removed old exclusive role ${otherRoleId} from ${user.tag}`);
                     }
                 }
             }
             
-            // নতুন রোল অ্যাড করো
+            // Add the new role
             await member.roles.add(role);
-            console.log(`✅ ${user.tag} কে ${role.name} রোল দেওয়া হলো`);
+            console.log(`✅ Added ${role.name} to ${user.tag}`);
+            
+            // Send feedback if needed
+            try {
+                await user.send(`✅ Added **${role.name}** role to you`);
+            } catch (e) {
+                // User has DMs disabled
+            }
         }
+    } catch (error) {
+        console.error('❌ Error in messageReactionAdd:', error);
     }
-};
+}
