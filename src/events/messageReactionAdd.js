@@ -1,13 +1,16 @@
-// Reaction Role Add Event - Handles when a user adds a reaction
+// Reaction Role Add Event - Memory Storage (No Database Needed)
 
-// ========== IN-MEMORY CACHE ==========
-const roleConfigCache = new Map();
+// ========== MEMORY STORAGE ==========
+const roleConfigs = new Map();
 
 // ========== EXCLUSIVE GROUPS ==========
-// Replace with your actual role IDs
+// Replace these with your actual role IDs
 const exclusiveGroups = [
-    // ['ROLE_ID_1', 'ROLE_ID_2', 'ROLE_ID_3'],
-    // ['ROLE_ID_4', 'ROLE_ID_5'],
+    // Example: Region roles - user can only have one
+    // ['REGION_ROLE_ID_1', 'REGION_ROLE_ID_2', 'REGION_ROLE_ID_3'],
+    
+    // Example: Color roles
+    // ['COLOR_ROLE_ID_1', 'COLOR_ROLE_ID_2', 'COLOR_ROLE_ID_3'],
 ];
 
 function getExclusiveGroup(roleId) {
@@ -19,62 +22,23 @@ function getExclusiveGroup(roleId) {
     return null;
 }
 
-// ========== DATABASE FUNCTIONS ==========
-async function getRoleConfig(messageId, emoji) {
+// ========== SAVE & GET FUNCTIONS (Memory only) ==========
+export function saveReactionRole(messageId, emoji, roleId, guildId, channelId) {
     const key = `${messageId}_${emoji}`;
-    
-    if (roleConfigCache.has(key)) {
-        return roleConfigCache.get(key);
-    }
-
-    try {
-        const { db } = await import('../config/database.js');
-        const query = `
-            SELECT message_id, emoji, role_id, guild_id, channel_id
-            FROM reaction_roles
-            WHERE message_id = $1 AND emoji = $2
-        `;
-        const result = await db.query(query, [messageId, emoji]);
-        
-        if (result.rows.length > 0) {
-            const config = result.rows[0];
-            roleConfigCache.set(key, config);
-            return config;
-        }
-        return null;
-    } catch (error) {
-        console.error('❌ Database error in getRoleConfig:', error);
-        return null;
-    }
+    roleConfigs.set(key, { 
+        message_id: messageId, 
+        emoji, 
+        role_id: roleId, 
+        guild_id: guildId, 
+        channel_id: channelId 
+    });
+    console.log(`✅ Reaction role saved in memory: ${key} -> ${roleId}`);
+    return true;
 }
 
-export async function saveReactionRole(messageId, emoji, roleId, guildId, channelId) {
+function getRoleConfig(messageId, emoji) {
     const key = `${messageId}_${emoji}`;
-    
-    try {
-        const { db } = await import('../config/database.js');
-        const query = `
-            INSERT INTO reaction_roles (message_id, emoji, role_id, guild_id, channel_id, created_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())
-            ON CONFLICT (message_id, emoji) DO UPDATE 
-            SET role_id = $3, updated_at = NOW()
-        `;
-        await db.query(query, [messageId, emoji, roleId, guildId, channelId]);
-        
-        roleConfigCache.set(key, { 
-            message_id: messageId, 
-            emoji, 
-            role_id: roleId, 
-            guild_id: guildId, 
-            channel_id: channelId 
-        });
-        
-        console.log(`✅ Reaction role saved: ${key} -> ${roleId}`);
-        return true;
-    } catch (error) {
-        console.error('❌ Error saving reaction role:', error);
-        return false;
-    }
+    return roleConfigs.get(key) || null;
 }
 
 // ========== MAIN EVENT ==========
@@ -88,7 +52,7 @@ export default {
             if (reaction.partial) await reaction.fetch();
             if (reaction.message.partial) await reaction.message.fetch();
 
-            const config = await getRoleConfig(
+            const config = getRoleConfig(
                 reaction.message.id, 
                 reaction.emoji.name || reaction.emoji.id
             );
