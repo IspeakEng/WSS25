@@ -5,15 +5,13 @@ import {
 
 import { logger } from '../utils/logger.js';
 
-const LOG_USER_ID = '1054967242497982476';
+const LOG_CHANNEL_ID = '1541753459672350770';
 
 export default {
     name: Events.MessageUpdate,
 
     async execute(oldMessage, newMessage, client) {
-
         try {
-
             // Ignore DMs
             if (!newMessage.guild) {
                 return;
@@ -65,10 +63,10 @@ export default {
                 .setTitle('✏️ Message Edited')
                 .setColor(0xFEE75C)
                 .setThumbnail(
-                    newMessage.author.displayAvatarURL({
+                    newMessage.author?.displayAvatarURL({
                         dynamic: true,
                         size: 128,
-                    })
+                    }) || null
                 )
                 .addFields(
                     {
@@ -102,20 +100,27 @@ export default {
                 })
                 .setTimestamp();
 
-            // Send DM to you
-            const user = await client.users.fetch(LOG_USER_ID);
+            // Get log channel
+            const logChannel = await client.channels.fetch(
+                LOG_CHANNEL_ID
+            );
 
-            await user.send({
+            // Make sure the channel can receive messages
+            if (!logChannel || !logChannel.isTextBased()) {
+                logger.error('Log channel not found or is not text-based.');
+                return;
+            }
+
+            // Send log to channel
+            await logChannel.send({
                 embeds: [embed],
             });
 
         } catch (error) {
-
             logger.error(
                 'Error in messageUpdate event:',
                 error
             );
-
         }
     },
 };
