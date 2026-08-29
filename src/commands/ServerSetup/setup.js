@@ -1,8 +1,8 @@
-const {
+import {
     SlashCommandBuilder,
     ChannelType,
     PermissionFlagsBits
-} = require("discord.js");
+} from "discord.js";
 
 const structure = [
     {
@@ -41,7 +41,7 @@ const structure = [
     }
 ];
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName("setup")
         .setDescription("Automatically create the WSS'25 server structure")
@@ -50,9 +50,21 @@ module.exports = {
     async execute(interaction) {
         const guild = interaction.guild;
 
+        if (!guild) {
+            return interaction.reply({
+                content: "❌ This command can only be used inside a server.",
+                ephemeral: true
+            });
+        }
+
         await interaction.deferReply({ ephemeral: true });
 
-        if (!guild.members.me.permissions.has(PermissionFlagsBits.ManageChannels)) {
+        const botMember = guild.members.me;
+
+        if (
+            !botMember ||
+            !botMember.permissions.has(PermissionFlagsBits.ManageChannels)
+        ) {
             return interaction.editReply(
                 "❌ I need the **Manage Channels** permission."
             );
@@ -63,15 +75,13 @@ module.exports = {
 
         try {
             for (const section of structure) {
-
-                // Find existing category
                 let category = guild.channels.cache.find(
-                    c =>
-                        c.type === ChannelType.GuildCategory &&
-                        c.name.toLowerCase() === section.category.toLowerCase()
+                    channel =>
+                        channel.type === ChannelType.GuildCategory &&
+                        channel.name.toLowerCase() ===
+                            section.category.toLowerCase()
                 );
 
-                // Create category
                 if (!category) {
                     category = await guild.channels.create({
                         name: section.category,
@@ -81,24 +91,22 @@ module.exports = {
                     created++;
                 }
 
-                // Create channels
                 for (const [name, type] of section.channels) {
-
-                    const exists = guild.channels.cache.find(
-                        c =>
-                            c.parentId === category.id &&
-                            c.name.toLowerCase() === name.toLowerCase() &&
-                            c.type === type
+                    const existingChannel = guild.channels.cache.find(
+                        channel =>
+                            channel.parentId === category.id &&
+                            channel.name.toLowerCase() === name.toLowerCase() &&
+                            channel.type === type
                     );
 
-                    if (exists) {
+                    if (existingChannel) {
                         skipped++;
                         continue;
                     }
 
                     await guild.channels.create({
-                        name: name,
-                        type: type,
+                        name,
+                        type,
                         parent: category.id
                     });
 
@@ -107,16 +115,16 @@ module.exports = {
             }
 
             await interaction.editReply(
-                `✅ **Server setup complete!**\n\n` +
-                `📁 Channels/Categories created: **${created}**\n` +
+                `✅ **WSS'25 server setup complete!**\n\n` +
+                `📁 Created: **${created}**\n` +
                 `⏭️ Already existed: **${skipped}**`
             );
 
         } catch (error) {
-            console.error(error);
+            console.error("Setup command error:", error);
 
             await interaction.editReply(
-                "❌ Something went wrong while creating the channels."
+                "❌ Something went wrong while creating the server structure."
             );
         }
     }
