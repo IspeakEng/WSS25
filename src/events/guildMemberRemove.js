@@ -1,12 +1,17 @@
 import { Events } from 'discord.js';
-import { getGuildConfig } from '../services/config/guildConfig.js';
-import { logEvent, EVENT_TYPES } from '../services/loggingService.js';
+import {
+    logEvent,
+    EVENT_TYPES
+} from '../services/loggingService.js';
 import {
     getServerCounters,
     updateCounter
 } from '../services/serverstatsService.js';
+import {
+    getLeaveChannel,
+    createLeaveEmbed
+} from '../services/welcomeLeaveService.js';
 import { logger } from '../utils/logger.js';
-import { getLeaveChannel, createLeaveEmbed } from '../services/welcomeLeaveService.js';
 
 export default {
     name: Events.GuildMemberRemove,
@@ -15,6 +20,7 @@ export default {
     async execute(member) {
         try {
             const { guild, user } = member;
+            const client = member.client;
 
             // ==========================================
             // MEMBER LEAVE LOG
@@ -22,7 +28,7 @@ export default {
 
             try {
                 await logEvent({
-                    client: member.client,
+                    client,
                     guildId: guild.id,
                     eventType: EVENT_TYPES.MEMBER_LEAVE,
                     data: {
@@ -30,45 +36,92 @@ export default {
                         lines: [
                             `**User:** ${user.toString()} (${user.tag})`,
                             `**ID:** \`${user.id}\``,
-                            `**Joined:** <t:${Math.floor(member.joinedTimestamp / 1000)}:R>`,
+                            `**Joined:** ${
+                                member.joinedTimestamp
+                                    ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>`
+                                    : 'Unknown'
+                            }`,
                             `**Members:** ${guild.memberCount}`
                         ],
                         quoted: false,
                         thumbnail: user.displayAvatarURL({
-                            dynamic: true
+                            dynamic: true,
+                            size: 256
                         }),
                         userId: user.id
                     }
                 });
             } catch (error) {
-                logger.debug('Error logging member leave:', error);
+                logger.debug(
+                    'Error logging member leave:',
+                    error
+                );
             }
 
             // ==========================================
-            // LEAVE EMBED (ডাটাবেস থেকে চ্যানেল আইডি নিয়ে)
+            // LEAVE MESSAGE
             // ==========================================
 
             try {
-                const leaveChannelId = await getLeaveChannel(member.client, guild.id);
-                
-                if (leaveChannelId) {
-                    const leaveChannel = guild.channels.cache.get(leaveChannelId);
-                    
-                    if (leaveChannel?.isTextBased()) {
-                        const embed = createLeaveEmbed(member);
+                const leaveChannelId = await getLeaveChannel(
+                    client,
+                    guild.id
+                );
+
+                if (!leaveChannelId) {
+                    logger.debug(
+                        `No leave channel configured for guild ${guild.id}`
+                    );
+                } else {
+                    let leaveChannel = null;
+
+                    // First try cache
+                    leaveChannel =
+                        guild.channels.cache.get(
+                            leaveChannelId
+                        );
+
+                    // If not cached, fetch it
+                    if (!leaveChannel) {
+                        try {
+                            leaveChannel =
+                                await client.channels.fetch(
+                                    leaveChannelId
+                                );
+                        } catch (fetchError) {
+                            logger.warn(
+                                `Could not fetch leave channel ${leaveChannelId}:`,
+                                fetchError
+                            );
+                        }
+                    }
+
+                    if (
+                        !leaveChannel ||
+                        !leaveChannel.isTextBased()
+                    ) {
+                        logger.warn(
+                            `Leave channel ${leaveChannelId} is missing or not text-based.`
+                        );
+                    } else {
+                        const embed =
+                            createLeaveEmbed(member);
+
                         await leaveChannel.send({
                             content: `🌙 farewell, ${user.username} ♡`,
                             embeds: [embed]
                         });
-                    } else {
-                        logger.debug(`Leave channel ${leaveChannelId} not found or not text-based in guild ${guild.id}`);
-                    }
-                } else {
-                    logger.debug(`No leave channel set for guild ${guild.id}`);
-                }
 
+                        logger.info(
+                            `Leave message sent for ${user.tag} in ${guild.name}`
+                        );
+                    }
+                }
             } catch (error) {
-                logger.error('Error sending leave embed:', error);
+                logger.error(
+                    'Error sending leave message:',
+                    error
+                );
             }
 
             // ==========================================
@@ -76,18 +129,37 @@ export default {
             // ==========================================
 
             try {
-                const counters = await getServerCounters(member.client, guild.id);
+                const counters =
+                    await getServerCounters(
+                        client,
+                        guild.id
+                    );
+
                 for (const counter of counters) {
-                    if (counter?.type && counter?.channelId && counter.enabled !== false) {
-                        await updateCounter(member.client, guild, counter);
+                    if (
+                        counter?.type &&
+                        counter?.channelId &&
+                        counter.enabled !== false
+                    ) {
+                        await updateCounter(
+                            client,
+                            guild,
+                            counter
+                        );
                     }
                 }
             } catch (error) {
-                logger.debug('Error updating counters on member leave:', error);
+                logger.debug(
+                    'Error updating counters on member leave:',
+                    error
+                );
             }
 
         } catch (error) {
-            logger.error('Error in guildMemberRemove event:', error);
+            logger.error(
+                'Error in guildMemberRemove event:',
+                error
+            );
         }
     }
 };
