@@ -18,10 +18,11 @@ export default {
     once: false,
 
     async execute(member) {
-        try {
-            const { guild, user } = member;
-            const client = member.client;
+        const guild = member.guild;
+        const user = member.user;
+        const client = member.client;
 
+        try {
             // ==========================================
             // MEMBER LEAVE LOG
             // ==========================================
@@ -68,44 +69,67 @@ export default {
                     guild.id
                 );
 
+                logger.debug(
+                    `Leave channel for ${guild.name}: ${leaveChannelId || 'NOT SET'}`
+                );
+
                 if (!leaveChannelId) {
-                    logger.debug(
+                    logger.warn(
                         `No leave channel configured for guild ${guild.id}`
                     );
                 } else {
                     let leaveChannel = null;
 
-                    // First try cache
+                    // ------------------------------------------
+                    // Try guild cache first
+                    // ------------------------------------------
+
                     leaveChannel =
                         guild.channels.cache.get(
                             leaveChannelId
                         );
 
-                    // If not cached, fetch it
+                    // ------------------------------------------
+                    // If not cached, fetch from Discord
+                    // ------------------------------------------
+
                     if (!leaveChannel) {
                         try {
                             leaveChannel =
                                 await client.channels.fetch(
                                     leaveChannelId
                                 );
-                        } catch (fetchError) {
-                            logger.warn(
-                                `Could not fetch leave channel ${leaveChannelId}:`,
-                                fetchError
+                        } catch (error) {
+                            logger.error(
+                                `Failed to fetch leave channel ${leaveChannelId}:`,
+                                error
                             );
                         }
                     }
 
-                    if (
-                        !leaveChannel ||
-                        !leaveChannel.isTextBased()
-                    ) {
+                    // ------------------------------------------
+                    // Validate channel
+                    // ------------------------------------------
+
+                    if (!leaveChannel) {
                         logger.warn(
-                            `Leave channel ${leaveChannelId} is missing or not text-based.`
+                            `Leave channel ${leaveChannelId} could not be found.`
+                        );
+                    } else if (!leaveChannel.isTextBased()) {
+                        logger.warn(
+                            `Leave channel ${leaveChannelId} is not a text-based channel.`
                         );
                     } else {
+                        // --------------------------------------
+                        // Create leave embed
+                        // --------------------------------------
+
                         const embed =
                             createLeaveEmbed(member);
+
+                        // --------------------------------------
+                        // Send leave message
+                        // --------------------------------------
 
                         await leaveChannel.send({
                             content: `🌙 farewell, ${user.username} ♡`,
@@ -113,13 +137,13 @@ export default {
                         });
 
                         logger.info(
-                            `Leave message sent for ${user.tag} in ${guild.name}`
+                            `Leave message successfully sent for ${user.tag} in ${guild.name}`
                         );
                     }
                 }
             } catch (error) {
                 logger.error(
-                    'Error sending leave message:',
+                    `Error sending leave message in guild ${guild.id}:`,
                     error
                 );
             }
@@ -137,8 +161,9 @@ export default {
 
                 for (const counter of counters) {
                     if (
-                        counter?.type &&
-                        counter?.channelId &&
+                        counter &&
+                        counter.type &&
+                        counter.channelId &&
                         counter.enabled !== false
                     ) {
                         await updateCounter(
@@ -157,7 +182,7 @@ export default {
 
         } catch (error) {
             logger.error(
-                'Error in guildMemberRemove event:',
+                `Error in guildMemberRemove event for guild ${guild?.id}:`,
                 error
             );
         }
