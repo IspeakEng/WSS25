@@ -1,16 +1,15 @@
-const {
+import {
     SlashCommandBuilder,
     PermissionFlagsBits,
     EmbedBuilder
-} = require('discord.js');
+} from 'discord.js';
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('botprofile')
         .setDescription('Change the bot avatar or banner')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator.toString())
 
-        // /botprofile avatar
         .addSubcommand(subcommand =>
             subcommand
                 .setName('avatar')
@@ -23,7 +22,6 @@ module.exports = {
                 )
         )
 
-        // /botprofile banner
         .addSubcommand(subcommand =>
             subcommand
                 .setName('banner')
@@ -37,9 +35,11 @@ module.exports = {
         ),
 
     async execute(interaction) {
-
-        // Administrator check
-        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+        if (
+            !interaction.member.permissions.has(
+                PermissionFlagsBits.Administrator
+            )
+        ) {
             return interaction.reply({
                 content: '❌ You need Administrator permission to use this command.',
                 ephemeral: true
@@ -49,7 +49,6 @@ module.exports = {
         const type = interaction.options.getSubcommand();
         const image = interaction.options.getAttachment('image');
 
-        // Allowed image formats
         const allowedTypes = [
             'image/png',
             'image/jpeg',
@@ -59,7 +58,9 @@ module.exports = {
 
         if (!image.contentType || !allowedTypes.includes(image.contentType)) {
             return interaction.reply({
-                content: '❌ Invalid image format!\n\nSupported: PNG, JPG, JPEG, WebP and GIF.',
+                content:
+                    '❌ Invalid image format!\n\n' +
+                    'Supported: PNG, JPG, JPEG, WebP and GIF.',
                 ephemeral: true
             });
         }
@@ -67,13 +68,7 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
 
         try {
-
-            // =========================
-            // CHANGE AVATAR
-            // =========================
-
             if (type === 'avatar') {
-
                 await interaction.client.user.setAvatar(image.url);
 
                 const embed = new EmbedBuilder()
@@ -90,12 +85,7 @@ module.exports = {
                 });
             }
 
-            // =========================
-            // CHANGE BANNER
-            // =========================
-
             if (type === 'banner') {
-
                 await interaction.client.user.setBanner(image.url);
 
                 const embed = new EmbedBuilder()
@@ -111,9 +101,7 @@ module.exports = {
                     embeds: [embed]
                 });
             }
-
         } catch (error) {
-
             console.error('Bot profile update error:', error);
 
             return interaction.editReply({
