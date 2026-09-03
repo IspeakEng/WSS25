@@ -1,14 +1,29 @@
 const getKey = (guildId) => `linkFilter:${guildId}`;
 
+
+/*
+ * ==========================================================================
+ * GET CONFIG
+ * ==========================================================================
+ */
+
 export async function getLinkFilterConfig(client, guildId) {
+
     try {
-        const data = await client.db.get(getKey(guildId), null);
+
+        const data =
+            await client.db.get(
+                getKey(guildId),
+                null
+            );
 
         return data || {
             enabled: false,
             roleId: null,
         };
+
     } catch {
+
         return {
             enabled: false,
             roleId: null,
@@ -16,7 +31,19 @@ export async function getLinkFilterConfig(client, guildId) {
     }
 }
 
-export async function setLinkFilterRole(client, guildId, roleId) {
+
+/*
+ * ==========================================================================
+ * SET BYPASS ROLE
+ * ==========================================================================
+ */
+
+export async function setLinkFilterRole(
+    client,
+    guildId,
+    roleId
+) {
+
     const config = {
         enabled: true,
         roleId,
@@ -30,35 +57,72 @@ export async function setLinkFilterRole(client, guildId, roleId) {
     return config;
 }
 
-export async function disableLinkFilter(client, guildId) {
+
+/*
+ * ==========================================================================
+ * DISABLE
+ * ==========================================================================
+ */
+
+export async function disableLinkFilter(
+    client,
+    guildId
+) {
+
     await client.db.delete(
         getKey(guildId)
     );
 }
 
-export async function canBypassLinkFilter(client, message) {
-    const config = await getLinkFilterConfig(
-        client,
-        message.guild.id
-    );
 
-    // Server owner can always send links/GIFs
+/*
+ * ==========================================================================
+ * CHECK BYPASS
+ * ==========================================================================
+ */
+
+export async function canBypassLinkFilter(
+    client,
+    message
+) {
+
+    const config =
+        await getLinkFilterConfig(
+            client,
+            message.guild.id
+        );
+
+
+    /*
+     * SERVER OWNER ALWAYS BYPASS
+     */
+
     if (
         message.author.id ===
         message.guild.ownerId
     ) {
+
         return true;
     }
 
-    // Filter disabled
+
+    /*
+     * FILTER DISABLED
+     */
+
     if (
         !config.enabled ||
         !config.roleId
     ) {
+
         return true;
     }
 
-    // Selected role can send links/GIFs
+
+    /*
+     * SELECTED ROLE BYPASS
+     */
+
     return (
         message.member?.roles?.cache?.has(
             config.roleId
@@ -68,48 +132,169 @@ export async function canBypassLinkFilter(client, message) {
 
 
 /*
- * Detect normal URLs + Discord invites
+ * ==========================================================================
+ * NORMAL LINK DETECTION
+ * ==========================================================================
  */
-export function containsLink(content = '') {
-    const text = String(content);
+
+export function containsLink(
+    content = ''
+) {
+
+    const text =
+        String(content);
+
+
+    /*
+     * HTTP / HTTPS / WWW
+     */
 
     const urlRegex =
         /(?:https?:\/\/|www\.)[^\s<]+/i;
 
-    const bareDomainRegex =
-        /(?:^|\s)(?!.*@)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<]*)?/i;
+
+    /*
+     * DISCORD INVITE
+     */
 
     const discordInviteRegex =
         /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[^\s<]+/i;
 
+
+    /*
+     * BARE DOMAIN
+     */
+
+    const bareDomainRegex =
+        /(?:^|\s)(?!.*@)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<]*)?/i;
+
+
     return (
         urlRegex.test(text) ||
-        bareDomainRegex.test(text) ||
-        discordInviteRegex.test(text)
+        discordInviteRegex.test(text) ||
+        bareDomainRegex.test(text)
     );
 }
 
 
 /*
- * Detect direct GIF uploads
+ * ==========================================================================
+ * GIF URL DETECTION
+ * ==========================================================================
  */
-export function containsGifAttachment(message) {
-    if (!message.attachments?.size) {
+
+function isGifUrl(
+    value = ''
+) {
+
+    const text =
+        String(value)
+            .toLowerCase()
+            .trim();
+
+
+    if (!text) {
         return false;
     }
 
+
+    /*
+     * DIRECT .GIF
+     */
+
+    if (
+        /\.gif(?:[?#]|$)/i.test(text)
+    ) {
+
+        return true;
+    }
+
+
+    /*
+     * TENOR
+     */
+
+    if (
+        text.includes('tenor.com/') ||
+        text.includes('tenor.com')
+    ) {
+
+        return true;
+    }
+
+
+    /*
+     * GIPHY
+     */
+
+    if (
+        text.includes('giphy.com/') ||
+        text.includes('giphy.com')
+    ) {
+
+        return true;
+    }
+
+
+    /*
+     * GIF SEARCH / MEDIA DOMAINS
+     */
+
+    if (
+        text.includes('media.tenor.com/') ||
+        text.includes('media.giphy.com/') ||
+        text.includes('i.giphy.com/')
+    ) {
+
+        return true;
+    }
+
+
+    return false;
+}
+
+
+/*
+ * ==========================================================================
+ * GIF ATTACHMENT DETECTION
+ * ==========================================================================
+ */
+
+export function containsGifAttachment(
+    message
+) {
+
+    if (
+        !message.attachments?.size
+    ) {
+
+        return false;
+    }
+
+
     return message.attachments.some(
         attachment => {
+
             const name =
-                attachment.name?.toLowerCase() || '';
+                attachment.name
+                    ?.toLowerCase() || '';
+
 
             const contentType =
-                attachment.contentType?.toLowerCase() || '';
+                attachment.contentType
+                    ?.toLowerCase() || '';
+
+
+            const url =
+                attachment.url
+                    ?.toLowerCase() || '';
+
 
             return (
                 name.endsWith('.gif') ||
                 contentType === 'image/gif' ||
-                contentType.startsWith('image/gif;')
+                contentType.startsWith('image/gif;') ||
+                isGifUrl(url)
             );
         }
     );
@@ -117,11 +302,151 @@ export function containsGifAttachment(message) {
 
 
 /*
- * Detect links OR GIFs
+ * ==========================================================================
+ * GIF EMBED DETECTION
+ * ==========================================================================
  */
-export function containsBlockedContent(message) {
-    return (
-        containsLink(message.content) ||
-        containsGifAttachment(message)
+
+export function containsGifEmbed(
+    message
+) {
+
+    if (
+        !message.embeds?.length
+    ) {
+
+        return false;
+    }
+
+
+    return message.embeds.some(
+        embed => {
+
+            const urls = [
+
+                embed.url,
+
+                embed.image?.url,
+
+                embed.image?.proxyURL,
+
+                embed.thumbnail?.url,
+
+                embed.thumbnail?.proxyURL,
+
+                embed.video?.url,
+
+                embed.video?.proxyURL,
+
+            ].filter(Boolean);
+
+
+            return urls.some(
+                url => isGifUrl(url)
+            );
+        }
     );
+}
+
+
+/*
+ * ==========================================================================
+ * GIF / LINK DETECTION
+ * ==========================================================================
+ */
+
+export function containsBlockedContent(
+    message
+) {
+
+    /*
+     * Normal links
+     */
+
+    if (
+        containsLink(
+            message.content
+        )
+    ) {
+
+        return true;
+    }
+
+
+    /*
+     * GIF attachment
+     */
+
+    if (
+        containsGifAttachment(
+            message
+        )
+    ) {
+
+        return true;
+    }
+
+
+    /*
+     * GIF embed / Discord GIF picker
+     */
+
+    if (
+        containsGifEmbed(
+            message
+        )
+    ) {
+
+        return true;
+    }
+
+
+    /*
+     * Check embed URLs generally
+     *
+     * This catches cases where Discord
+     * converts a GIF into an embed.
+     */
+
+    if (
+        message.embeds?.length
+    ) {
+
+        for (
+            const embed
+            of message.embeds
+        ) {
+
+            const urls = [
+
+                embed.url,
+
+                embed.image?.url,
+
+                embed.image?.proxyURL,
+
+                embed.thumbnail?.url,
+
+                embed.thumbnail?.proxyURL,
+
+                embed.video?.url,
+
+                embed.video?.proxyURL,
+
+            ].filter(Boolean);
+
+
+            if (
+                urls.some(
+                    url => isGifUrl(url)
+                )
+            ) {
+
+                return true;
+            }
+        }
+    }
+
+
+    return false;
 }
