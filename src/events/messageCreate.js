@@ -48,11 +48,19 @@ import {
 } from '../services/countingGameService.js';
 
 
-/*
- * ==========================================================================
- * AUTO MENTION REACTION CONFIG
- * ==========================================================================
- */
+// ==========================================================================
+// LINK / GIF FILTER
+// ==========================================================================
+
+import {
+    canBypassLinkFilter,
+    containsBlockedContent,
+} from '../services/linkFilterService.js';
+
+
+// ==========================================================================
+// AUTO MENTION REACTION CONFIG
+// ==========================================================================
 
 // YOUR Discord User ID
 const TARGET_USER_ID = '1054967242497982476';
@@ -70,11 +78,9 @@ const FRIEND_USER_ID = '1498287924301795388';
 const FRIEND_REACTION_EMOJI = '💖';
 
 
-/*
- * ==========================================================================
- * MESSAGE CREATE
- * ==========================================================================
- */
+// ==========================================================================
+// MESSAGE CREATE
+// ==========================================================================
 
 export default {
     name: Events.MessageCreate,
@@ -83,11 +89,9 @@ export default {
 
         try {
 
-            /*
-             * ----------------------------------------------------------------------
-             * IGNORE BOTS AND DMs
-             * ----------------------------------------------------------------------
-             */
+            // ==================================================================
+            // IGNORE BOTS AND DMs
+            // ==================================================================
 
             if (
                 message.author.bot ||
@@ -97,11 +101,9 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * AFK SYSTEM
-             * ==========================================================================
-             */
+            // ==================================================================
+            // AFK SYSTEM
+            // ==================================================================
 
             try {
 
@@ -109,11 +111,9 @@ export default {
                     await import('../utils/database.js');
 
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * REMOVE AFK WHEN AFK USER SENDS A MESSAGE
-                 * ----------------------------------------------------------------------
-                 */
+                // ----------------------------------------------------------------
+                // REMOVE AFK WHEN AFK USER SENDS A MESSAGE
+                // ----------------------------------------------------------------
 
                 const authorAFKKey =
                     getAFKKey(
@@ -152,11 +152,9 @@ export default {
                 }
 
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * CHECK MENTIONED USERS FOR AFK STATUS
-                 * ----------------------------------------------------------------------
-                 */
+                // ----------------------------------------------------------------
+                // CHECK MENTIONED USERS FOR AFK STATUS
+                // ----------------------------------------------------------------
 
                 for (
                     const [, mentionedUser]
@@ -174,6 +172,7 @@ export default {
                         continue;
                     }
 
+
                     const mentionedAFKKey =
                         getAFKKey(
                             message.guild.id,
@@ -190,12 +189,15 @@ export default {
                         continue;
                     }
 
+
                     const reason =
                         afkData.reason ||
                         'No reason provided';
 
+
                     let timestampText =
                         'Unknown';
+
 
                     if (afkData.timestamp) {
 
@@ -217,6 +219,7 @@ export default {
                                 );
                         }
 
+
                         if (
                             Number.isFinite(timestampMs)
                         ) {
@@ -227,6 +230,7 @@ export default {
                                 )}:R>`;
                         }
                     }
+
 
                     await message.channel.send({
                         content:
@@ -245,36 +249,30 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * AUTO MENTION REACTIONS
-             * ==========================================================================
-             *
-             * Reactions ONLY happen on normal messages.
-             *
-             * If the message is a REPLY, reactions are skipped.
-             *
-             * Other systems like AFK, bad words, counting and commands
-             * will still continue normally.
-             *
-             * ==========================================================================
-             */
+            // ==================================================================
+            // AUTO MENTION REACTIONS
+            // ==================================================================
+            //
+            // Reactions ONLY happen on normal messages.
+            //
+            // If the message is a REPLY, reactions are skipped.
+            //
+            // Other systems like AFK, bad words, link filter,
+            // counting and commands will still continue normally.
+            //
+            // ==================================================================
 
             try {
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * ONLY RUN AUTO REACTION IF THIS IS NOT A REPLY
-                 * ----------------------------------------------------------------------
-                 */
+                // ----------------------------------------------------------------
+                // ONLY RUN AUTO REACTION IF THIS IS NOT A REPLY
+                // ----------------------------------------------------------------
 
                 if (!message.reference) {
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * CHECK IF YOU WERE MENTIONED
-                     * ------------------------------------------------------------------
-                     */
+                    // ------------------------------------------------------------
+                    // CHECK IF YOU WERE MENTIONED
+                    // ------------------------------------------------------------
 
                     const targetMentioned =
                         message.mentions.users.has(
@@ -282,11 +280,9 @@ export default {
                         );
 
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * CHECK IF FRIEND WAS MENTIONED
-                     * ------------------------------------------------------------------
-                     */
+                    // ------------------------------------------------------------
+                    // CHECK IF FRIEND WAS MENTIONED
+                    // ------------------------------------------------------------
 
                     const friendMentioned =
                         message.mentions.users.has(
@@ -294,11 +290,9 @@ export default {
                         );
 
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * REACT WHEN YOU ARE MENTIONED
-                     * ------------------------------------------------------------------
-                     */
+                    // ------------------------------------------------------------
+                    // REACT WHEN YOU ARE MENTIONED
+                    // ------------------------------------------------------------
 
                     if (targetMentioned) {
 
@@ -326,11 +320,9 @@ export default {
                     }
 
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * REACT WHEN FRIEND IS MENTIONED
-                     * ------------------------------------------------------------------
-                     */
+                    // ------------------------------------------------------------
+                    // REACT WHEN FRIEND IS MENTIONED
+                    // ------------------------------------------------------------
 
                     if (friendMentioned) {
 
@@ -350,7 +342,6 @@ export default {
 
                             });
                     }
-
                 }
 
             } catch (error) {
@@ -362,21 +353,9 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * BAD WORD FILTER
-             * ==========================================================================
-             *
-             * BAD WORD MESSAGE:
-             *
-             * 1. Message is detected.
-             * 2. Message is deleted.
-             * 3. No public warning is sent.
-             * 4. No DM is sent.
-             * 5. No other message systems continue processing it.
-             *
-             * ==========================================================================
-             */
+            // ==================================================================
+            // BAD WORD FILTER
+            // ==================================================================
 
             const badWords = [
                 'fuck',
@@ -394,8 +373,10 @@ export default {
                 'cum',
             ];
 
+
             const content =
                 message.content.toLowerCase();
+
 
             const containsBadWord =
                 badWords.some(
@@ -403,17 +384,17 @@ export default {
                         content.includes(word)
                 );
 
+
             if (containsBadWord) {
 
                 try {
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * DELETE BAD WORD MESSAGE ONLY
-                     * ------------------------------------------------------------------
-                     */
+                    // ------------------------------------------------------------
+                    // DELETE BAD WORD MESSAGE
+                    // ------------------------------------------------------------
 
-                    await message.delete()
+                    await message
+                        .delete()
                         .catch(() => {});
 
                 } catch (error) {
@@ -424,35 +405,104 @@ export default {
                     );
                 }
 
-                /*
-                 * Stop processing this message.
-                 *
-                 * This prevents:
-                 * - counting
-                 * - prefix commands
-                 * - other message processing
-                 */
+
+                // ------------------------------------------------------------
+                // STOP PROCESSING
+                // ------------------------------------------------------------
 
                 return;
             }
 
 
-            /*
-             * ==========================================================================
-             * MESSAGE LOG
-             * ==========================================================================
-             */
+            // ==================================================================
+            // LINK / GIF FILTER
+            // ==================================================================
+            //
+            // Normal members:
+            //
+            // ❌ Links
+            // ❌ GIF links
+            // ❌ Discord invites
+            // ❌ GIF attachments
+            //
+            // Configured bypass role:
+            //
+            // ✅ Links
+            // ✅ GIFs
+            // ✅ Discord invites
+            //
+            // This works server-wide.
+            //
+            // ==================================================================
+
+            try {
+
+                const hasBlockedContent =
+                    containsBlockedContent(message);
+
+
+                if (hasBlockedContent) {
+
+                    const allowed =
+                        await canBypassLinkFilter(
+                            client,
+                            message
+                        );
+
+
+                    // ------------------------------------------------------------
+                    // MEMBER DOES NOT HAVE BYPASS ROLE
+                    // ------------------------------------------------------------
+
+                    if (!allowed) {
+
+                        await message
+                            .delete()
+                            .catch(error => {
+
+                                logger.warn(
+                                    'Failed to delete blocked link/GIF message:',
+                                    error
+                                );
+
+                            });
+
+
+                        logger.info(
+                            `Deleted blocked link/GIF message from ${message.author.tag} in ${message.guild.name}`
+                        );
+
+
+                        // --------------------------------------------------------
+                        // IMPORTANT:
+                        // Do not continue to counting/prefix commands.
+                        // --------------------------------------------------------
+
+                        return;
+                    }
+                }
+
+            } catch (error) {
+
+                logger.error(
+                    'Error handling link/GIF filter:',
+                    error
+                );
+            }
+
+
+            // ==================================================================
+            // MESSAGE LOG
+            // ==================================================================
 
             logger.debug(
                 `Message received from ${message.author.tag}: ${message.content}`
             );
 
 
-            /*
-             * ==========================================================================
-             * COUNTING GAME
-             * ==========================================================================
-             */
+            // ==================================================================
+            // COUNTING GAME
+            // ==================================================================
 
             const countingProcessed =
                 await handleCountingGame(
@@ -460,16 +510,15 @@ export default {
                     client
                 );
 
+
             if (countingProcessed) {
                 return;
             }
 
 
-            /*
-             * ==========================================================================
-             * PREFIX COMMAND
-             * ==========================================================================
-             */
+            // ==================================================================
+            // PREFIX COMMAND
+            // ==================================================================
 
             await handlePrefixCommand(
                 message,
@@ -488,11 +537,9 @@ export default {
 };
 
 
-/*
- * ==========================================================================
- * PREFIX COMMAND
- * ==========================================================================
- */
+// ==========================================================================
+// PREFIX COMMAND
+// ==========================================================================
 
 async function handlePrefixCommand(
     message,
@@ -507,9 +554,11 @@ async function handlePrefixCommand(
                 message.guild.id
             );
 
+
         const prefix =
             guildConfig?.prefix ||
             getCommandPrefix();
+
 
         const parsed =
             parsePrefixCommand(
@@ -517,9 +566,11 @@ async function handlePrefixCommand(
                 prefix
             );
 
+
         if (!parsed) {
             return;
         }
+
 
         let {
             commandName,
@@ -527,14 +578,13 @@ async function handlePrefixCommand(
         } = parsed;
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * MUSIC SHORTCUTS
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // MUSIC SHORTCUTS
+        // ==================================================================
 
         const musicPrefixShortcut =
             commandName.toLowerCase();
+
 
         const MUSIC_PREFIX_SHORTCUTS =
             new Set([
@@ -545,6 +595,7 @@ async function handlePrefixCommand(
                 'stop',
                 'volume',
             ]);
+
 
         if (
             MUSIC_PREFIX_SHORTCUTS.has(
@@ -560,30 +611,32 @@ async function handlePrefixCommand(
             ];
         }
 
+
         logger.info(
             `Prefix command detected: ${commandName}, args: ${args.join(', ')}`
         );
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * RESOLVE COMMAND
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // RESOLVE COMMAND
+        // ==================================================================
 
         const resolvedCommandName =
             resolveCommandAlias(
                 commandName
             );
 
+
         logger.info(
             `Resolved command name: ${resolvedCommandName}`
         );
+
 
         const command =
             client.commands.get(
                 resolvedCommandName
             );
+
 
         if (!command) {
 
@@ -595,11 +648,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * MAINTENANCE
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // MAINTENANCE
+        // ==================================================================
 
         if (
             isMaintenanceMode() &&
@@ -621,15 +672,14 @@ async function handlePrefixCommand(
                 ],
             }).catch(() => {});
 
+
             return;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CATEGORY
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // CATEGORY
+        // ==================================================================
 
         if (
             !isCommandCategoryEnabled(
@@ -650,15 +700,14 @@ async function handlePrefixCommand(
                 ],
             }).catch(() => {});
 
+
             return;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * PREFIX RESTRICTION
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // PREFIX RESTRICTION
+        // ==================================================================
 
         const restriction =
             getPrefixRestriction(
@@ -666,6 +715,7 @@ async function handlePrefixCommand(
                 args,
                 resolveSubcommandAlias
             );
+
 
         if (
             !supportsPrefixExecution(
@@ -687,26 +737,27 @@ async function handlePrefixCommand(
                         color: 'info',
                     });
 
+
                 await message.channel.send({
                     embeds: [embed],
                 }).catch(() => {});
             }
 
+
             return;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * COMMAND ENABLED
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // COMMAND ENABLED
+        // ==================================================================
 
         const accessKey =
             resolvePrefixAccessKey(
                 command.data,
                 args
             );
+
 
         const commandEnabled =
             await isCommandEnabled(
@@ -715,6 +766,7 @@ async function handlePrefixCommand(
                 accessKey,
                 command.category
             );
+
 
         if (!commandEnabled) {
 
@@ -726,21 +778,22 @@ async function handlePrefixCommand(
                     color: 'error',
                 });
 
+
             await message.channel.send({
                 embeds: [embed],
             }).catch(() => {});
+
 
             return;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * ABUSE PROTECTION
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // ABUSE PROTECTION
+        // ==================================================================
 
         const mockInteractionForProtection = {
+
             guildId:
                 message.guild.id,
 
@@ -748,12 +801,14 @@ async function handlePrefixCommand(
                 message.author,
         };
 
+
         const abuseProtection =
             await enforceAbuseProtection(
                 mockInteractionForProtection,
                 command,
                 resolvedCommandName
             );
+
 
         if (
             !abuseProtection.allowed
@@ -764,6 +819,7 @@ async function handlePrefixCommand(
                     abuseProtection.remainingMs
                 );
 
+
             const embed =
                 createEmbed({
                     title: 'Command Cooldown',
@@ -772,23 +828,24 @@ async function handlePrefixCommand(
                     color: 'error',
                 });
 
+
             await message.channel.send({
                 embeds: [embed],
             }).catch(() => {});
+
 
             return;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * EXECUTE COMMAND
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // EXECUTE COMMAND
+        // ==================================================================
 
         logger.info(
             `Executing prefix command: ${prefix}${commandName} (resolved to ${resolvedCommandName}) by ${message.author.tag}`
         );
+
 
         await executePrefixCommand(
             command,
@@ -798,6 +855,7 @@ async function handlePrefixCommand(
             prefix,
             guildConfig
         );
+
 
     } catch (error) {
 
@@ -809,30 +867,28 @@ async function handlePrefixCommand(
 }
 
 
-/*
- * ==========================================================================
- * COUNTING GAME
- * ==========================================================================
- *
- * WRONG COUNT BEHAVIOR:
- *
- * 1
- * 2
- * 3
- * 8  <- WRONG
- *
- * 8 is deleted.
- *
- * The game continues:
- *
- * 4
- * 5
- * 6
- *
- * It does NOT reset to 1.
- *
- * ==========================================================================
- */
+// ==========================================================================
+// COUNTING GAME
+// ==========================================================================
+//
+// WRONG COUNT:
+//
+// 1
+// 2
+// 3
+// 8 <- WRONG
+//
+// 8 is deleted.
+//
+// Game continues:
+//
+// 4
+// 5
+// 6
+//
+// It does NOT reset to 1.
+//
+// ==========================================================================
 
 async function handleCountingGame(
     message,
@@ -841,11 +897,9 @@ async function handleCountingGame(
 
     try {
 
-        /*
-         * ----------------------------------------------------------------------
-         * GET COUNTING CONFIG
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // GET COUNTING CONFIG
+        // ==================================================================
 
         const config =
             await getCountingGameConfig(
@@ -854,11 +908,9 @@ async function handleCountingGame(
             );
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CHECK IF COUNTING GAME IS ACTIVE
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // CHECK IF COUNTING GAME IS ACTIVE
+        // ==================================================================
 
         if (
             !config.enabled ||
@@ -871,21 +923,17 @@ async function handleCountingGame(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * GET MESSAGE CONTENT
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // GET MESSAGE CONTENT
+        // ==================================================================
 
         const content =
             message.content.trim();
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CHECK NUMBER
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // CHECK NUMBER
+        // ==================================================================
 
         const validCount =
             isValidCountingMessage(
@@ -894,66 +942,48 @@ async function handleCountingGame(
             );
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CHECK SAME USER
-         * ----------------------------------------------------------------------
-         *
-         * The same person cannot count twice consecutively.
-         *
-         * Example:
-         *
-         * User A: 1
-         * User A: 2 <- deleted
-         *
-         * The sequence does NOT reset.
-         *
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // CHECK SAME USER
+        // ==================================================================
 
         const sameUserAttempt =
             message.author.id ===
             config.lastUserId;
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * WRONG COUNT OR SAME USER
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // WRONG COUNT OR SAME USER
+        // ==================================================================
 
         if (
             !validCount ||
             sameUserAttempt
         ) {
 
-            /*
-             * Delete ONLY the incorrect message.
-             */
+            // --------------------------------------------------------------
+            // DELETE ONLY INCORRECT MESSAGE
+            // --------------------------------------------------------------
 
-            await message.delete()
+            await message
+                .delete()
                 .catch(() => {});
 
 
-            /*
-             * DO NOT reset:
-             *
-             * - nextNumber
-             * - lastUserId
-             * - currentStreak
-             *
-             * The current counting position remains unchanged.
-             */
+            // --------------------------------------------------------------
+            // DO NOT RESET:
+            //
+            // nextNumber
+            // lastUserId
+            // currentStreak
+            // --------------------------------------------------------------
 
             const expectedNumber =
                 config.nextNumber;
 
 
-            /*
-             * ------------------------------------------------------------------
-             * SEND TEMPORARY WARNING
-             * ------------------------------------------------------------------
-             */
+            // --------------------------------------------------------------
+            // SEND TEMPORARY WARNING
+            // --------------------------------------------------------------
 
             const warningMessage =
                 await message.channel.send({
@@ -966,9 +996,9 @@ async function handleCountingGame(
                 }).catch(() => null);
 
 
-            /*
-             * Delete warning after 5 seconds.
-             */
+            // --------------------------------------------------------------
+            // DELETE WARNING AFTER 5 SECONDS
+            // --------------------------------------------------------------
 
             if (warningMessage) {
 
@@ -982,32 +1012,25 @@ async function handleCountingGame(
             }
 
 
-            /*
-             * Counting message handled.
-             */
+            // --------------------------------------------------------------
+            // COUNTING MESSAGE HANDLED
+            // --------------------------------------------------------------
 
             return true;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CORRECT COUNT
-         * ----------------------------------------------------------------------
-         */
+        // ==================================================================
+        // CORRECT COUNT
+        // ==================================================================
 
         await recordCorrectCount(
             client,
             message.guild.id,
-            message.author.id
+            message.author.id,
+            config
         );
 
-
-        /*
-         * ----------------------------------------------------------------------
-         * DONE
-         * ----------------------------------------------------------------------
-         */
 
         return true;
 
