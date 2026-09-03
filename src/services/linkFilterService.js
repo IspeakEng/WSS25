@@ -1,40 +1,13 @@
-/*
- * ==========================================================================
- * LINK FILTER SERVICE
- * ==========================================================================
- *
- * Server-wide link/GIF protection.
- *
- * Normal members:
- * ❌ Links
- * ❌ GIFs
- *
- * Whitelisted role:
- * ✅ Links
- * ✅ GIFs
- *
- * Configuration is stored in client.db.
- * ==========================================================================
- */
-
 const getKey = (guildId) => `linkFilter:${guildId}`;
 
-
-/**
- * Get link filter configuration.
- */
 export async function getLinkFilterConfig(client, guildId) {
     try {
-        const data = await client.db.get(
-            getKey(guildId),
-            null
-        );
+        const data = await client.db.get(getKey(guildId), null);
 
         return data || {
             enabled: false,
             roleId: null,
         };
-
     } catch {
         return {
             enabled: false,
@@ -43,15 +16,7 @@ export async function getLinkFilterConfig(client, guildId) {
     }
 }
 
-
-/**
- * Set the allowed role.
- */
-export async function setLinkFilterRole(
-    client,
-    guildId,
-    roleId
-) {
+export async function setLinkFilterRole(client, guildId, roleId) {
     const config = {
         enabled: true,
         roleId,
@@ -65,56 +30,45 @@ export async function setLinkFilterRole(
     return config;
 }
 
-
-/**
- * Disable the link filter.
- */
-export async function disableLinkFilter(
-    client,
-    guildId
-) {
+export async function disableLinkFilter(client, guildId) {
     await client.db.delete(
         getKey(guildId)
     );
 }
 
+export async function canBypassLinkFilter(client, message) {
+    const config = await getLinkFilterConfig(
+        client,
+        message.guild.id
+    );
 
-/**
- * Check whether a member is allowed to send
- * links/GIFs.
- */
-export async function canBypassLinkFilter(
-    client,
-    message
-) {
-    const config =
-        await getLinkFilterConfig(
-            client,
-            message.guild.id
-        );
-
-    if (!config.enabled || !config.roleId) {
+    // Server owner can always send links/GIFs
+    if (
+        message.author.id ===
+        message.guild.ownerId
+    ) {
         return true;
     }
 
-    return message.member?.roles?.cache?.has(
-        config.roleId
-    ) ?? false;
+    // Filter disabled
+    if (
+        !config.enabled ||
+        !config.roleId
+    ) {
+        return true;
+    }
+
+    // Selected role can send links/GIFs
+    return (
+        message.member?.roles?.cache?.has(
+            config.roleId
+        ) ?? false
+    );
 }
 
 
-/**
- * Detect URLs inside message content.
- *
- * This catches:
- * https://example.com
- * http://example.com
- * www.example.com
- * discord.gg/example
- * discord.com/invite/example
- * tenor.com
- * giphy.com
- * etc.
+/*
+ * Detect normal URLs + Discord invites
  */
 export function containsLink(content = '') {
     const text = String(content);
@@ -122,18 +76,22 @@ export function containsLink(content = '') {
     const urlRegex =
         /(?:https?:\/\/|www\.)[^\s<]+/i;
 
+    const bareDomainRegex =
+        /(?:^|\s)(?!.*@)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s<]*)?/i;
+
     const discordInviteRegex =
         /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[^\s<]+/i;
 
     return (
         urlRegex.test(text) ||
+        bareDomainRegex.test(text) ||
         discordInviteRegex.test(text)
     );
 }
 
 
-/**
- * Detect GIF attachments.
+/*
+ * Detect direct GIF uploads
  */
 export function containsGifAttachment(message) {
     if (!message.attachments?.size) {
@@ -158,8 +116,8 @@ export function containsGifAttachment(message) {
 }
 
 
-/**
- * Detect a blocked message.
+/*
+ * Detect links OR GIFs
  */
 export function containsBlockedContent(message) {
     return (
