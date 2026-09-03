@@ -7,7 +7,22 @@ import {
 } from '../services/serverstatsService.js';
 import { setBirthday as dbSetBirthday } from '../utils/database.js';
 import { logger } from '../utils/logger.js';
-import { getWelcomeChannel, createWelcomeEmbed } from '../services/welcomeLeaveService.js';
+import {
+    getWelcomeChannel,
+    createWelcomeEmbed
+} from '../services/welcomeLeaveService.js';
+
+// ============================================================
+// CHANNEL CONFIG
+// ============================================================
+
+const GENERAL_CHANNEL_ID = '1543555992904663076';
+const RULES_CHANNEL_ID = '1543555984612524094';
+const ROLES_CHANNEL_ID = '1543555991688192102';
+
+// ============================================================
+// GUILD MEMBER ADD
+// ============================================================
 
 export default {
     name: Events.GuildMemberAdd,
@@ -103,15 +118,26 @@ export default {
             }
 
             // ==========================================
-            // WELCOME EMBED (IMMEDIATE)
+            // WELCOME EMBED - IMMEDIATE
             // ==========================================
 
             try {
-                const welcomeChannelId = await getWelcomeChannel(member.client, guild.id);
+                const welcomeChannelId =
+                    await getWelcomeChannel(
+                        member.client,
+                        guild.id
+                    );
+
                 if (welcomeChannelId) {
-                    const welcomeChannel = guild.channels.cache.get(welcomeChannelId);
+                    const welcomeChannel =
+                        guild.channels.cache.get(
+                            welcomeChannelId
+                        );
+
                     if (welcomeChannel?.isTextBased()) {
-                        const embed = createWelcomeEmbed(member);
+                        const embed =
+                            createWelcomeEmbed(member);
+
                         await welcomeChannel.send({
                             content: `☁️ welcome, ${member}`,
                             embeds: [embed]
@@ -119,46 +145,57 @@ export default {
                     }
                 }
             } catch (error) {
-                logger.debug('Error sending welcome embed:', error);
+                logger.debug(
+                    'Error sending welcome embed:',
+                    error
+                );
             }
 
             // ============================================================
-            // 6 SECONDS LATER – SHORT & CUTE FOLLOW-UP
+            // SMALL GREETING - 3 SECONDS AFTER JOIN
             // ============================================================
 
-            setTimeout(async () => {
+            const greetingTimeout = setTimeout(async () => {
                 try {
-                    // ✅ সরাসরি general চ্যানেল আইডি
-                    const GENERAL_CHANNEL_ID = '1534104536879206412';
-                    const generalChannel = guild.channels.cache.get(GENERAL_CHANNEL_ID);
+                    const generalChannel =
+                        guild.channels.cache.get(
+                            GENERAL_CHANNEL_ID
+                        );
 
-                    if (!generalChannel) return;
+                    if (!generalChannel?.isTextBased()) {
+                        return;
+                    }
 
-                    // ✅ তোমার দেওয়া channel IDs
-                    const ROLES_CHANNEL_ID = '1527205606396661780';
-                    const RULES_CHANNEL_ID = '1527205591162814615';
+                    const greetingMessage =
+                        `୨୧・welcome ${member} ♡\n` +
+                        `╰・check <#${RULES_CHANNEL_ID}> & <#${ROLES_CHANNEL_ID}> ✦`;
 
-                    await generalChannel.send(
-                        `✨ hey ${member}! we're so glad you're here ♡\n\n` +
-                        `• head to <#${ROLES_CHANNEL_ID}> to pick roles\n` +
-                        `• check <#${RULES_CHANNEL_ID}> for the rules\n\n` +
-                        `enjoy your stay! ₊˚⊹♡`
-                    );
+                    await generalChannel.send({
+                        content: greetingMessage
+                    });
 
                 } catch (error) {
-                    logger.debug('Error sending follow-up welcome message:', error);
+                    logger.debug(
+                        'Error sending member greeting:',
+                        error
+                    );
                 }
-            }, 6000); // ⏱️ 6 seconds
+            }, 3000);
+
+            if (typeof greetingTimeout.unref === 'function') {
+                greetingTimeout.unref();
+            }
 
             // ==========================================
             // SERVER COUNTERS
             // ==========================================
 
             try {
-                const counters = await getServerCounters(
-                    member.client,
-                    guild.id
-                );
+                const counters =
+                    await getServerCounters(
+                        member.client,
+                        guild.id
+                    );
 
                 for (const counter of counters) {
                     if (
@@ -190,10 +227,13 @@ export default {
                     `guild:${guild.id}:birthdays:left`;
 
                 const backup =
-                    (await member.client.db.get(backupKey)) || {};
+                    (await member.client.db.get(
+                        backupKey
+                    )) || {};
 
                 if (backup[user.id]) {
-                    const { month, day } = backup[user.id];
+                    const { month, day } =
+                        backup[user.id];
 
                     await dbSetBirthday(
                         member.client,
@@ -230,10 +270,9 @@ export default {
     }
 };
 
-
-// ==========================================
+// ============================================================
 // VERIFICATION HELPER
-// ==========================================
+// ============================================================
 
 async function handleVerification(
     member,
@@ -290,10 +329,9 @@ async function handleVerification(
     }
 }
 
-
-// ==========================================
+// ============================================================
 // SAFE ROLE ASSIGNMENT
-// ==========================================
+// ============================================================
 
 async function assignRoleSafely(member, role) {
     try {
