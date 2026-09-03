@@ -1,6 +1,6 @@
 import { Events } from 'discord.js';
-
 import { logger } from '../utils/logger.js';
+
 import { parsePrefixCommand } from '../utils/prefixParser.js';
 
 import {
@@ -47,11 +47,6 @@ import {
     recordCorrectCount,
 } from '../services/countingGameService.js';
 
-import {
-    containsBlockedContent,
-    canBypassLinkFilter,
-} from '../services/linkFilterService.js';
-
 
 /*
  * ==========================================================================
@@ -59,14 +54,19 @@ import {
  * ==========================================================================
  */
 
+// YOUR Discord User ID
 const TARGET_USER_ID = '1054967242497982476';
 
+// Your custom emoji ID
 const TARGET_REACTION_EMOJIS = [
     '💗',
 ];
 
+
+// FRIEND'S Discord User ID
 const FRIEND_USER_ID = '1498287924301795388';
 
+// Friend reaction emoji
 const FRIEND_REACTION_EMOJI = '💖';
 
 
@@ -99,71 +99,6 @@ export default {
 
             /*
              * ==========================================================================
-             * LINK / GIF FILTER
-             * ==========================================================================
-             *
-             * Server Owner:
-             *     Always allowed
-             *
-             * Selected bypass role:
-             *     Allowed
-             *
-             * Everyone else:
-             *     Links/GIFs are deleted automatically
-             *
-             * Works server-wide.
-             * ==========================================================================
-             */
-
-            try {
-
-                const hasBlockedContent =
-                    containsBlockedContent(message);
-
-                if (hasBlockedContent) {
-
-                    const allowed =
-                        await canBypassLinkFilter(
-                            client,
-                            message
-                        );
-
-                    if (!allowed) {
-
-                        await message.delete()
-                            .catch(error => {
-
-                                logger.warn(
-                                    'Failed to delete blocked link/GIF message:',
-                                    error
-                                );
-
-                            });
-
-                        logger.info(
-                            `Deleted blocked link/GIF message from ${message.author.tag} in ${message.guild.name}`
-                        );
-
-                        return;
-                    }
-                }
-
-            } catch (error) {
-
-                /*
-                 * If the filter/database has an error,
-                 * don't randomly delete messages.
-                 */
-
-                logger.error(
-                    'Error handling link/GIF filter:',
-                    error
-                );
-            }
-
-
-            /*
-             * ==========================================================================
              * AFK SYSTEM
              * ==========================================================================
              */
@@ -175,7 +110,9 @@ export default {
 
 
                 /*
+                 * ----------------------------------------------------------------------
                  * REMOVE AFK WHEN AFK USER SENDS A MESSAGE
+                 * ----------------------------------------------------------------------
                  */
 
                 const authorAFKKey =
@@ -216,7 +153,9 @@ export default {
 
 
                 /*
+                 * ----------------------------------------------------------------------
                  * CHECK MENTIONED USERS FOR AFK STATUS
+                 * ----------------------------------------------------------------------
                  */
 
                 for (
@@ -310,16 +249,44 @@ export default {
              * ==========================================================================
              * AUTO MENTION REACTIONS
              * ==========================================================================
+             *
+             * Reactions ONLY happen on normal messages.
+             *
+             * If the message is a REPLY, reactions are skipped.
+             *
+             * Other systems like AFK, bad words, counting and commands
+             * will still continue normally.
+             *
+             * ==========================================================================
              */
 
             try {
 
+                /*
+                 * ----------------------------------------------------------------------
+                 * ONLY RUN AUTO REACTION IF THIS IS NOT A REPLY
+                 * ----------------------------------------------------------------------
+                 */
+
                 if (!message.reference) {
+
+                    /*
+                     * ------------------------------------------------------------------
+                     * CHECK IF YOU WERE MENTIONED
+                     * ------------------------------------------------------------------
+                     */
 
                     const targetMentioned =
                         message.mentions.users.has(
                             TARGET_USER_ID
                         );
+
+
+                    /*
+                     * ------------------------------------------------------------------
+                     * CHECK IF FRIEND WAS MENTIONED
+                     * ------------------------------------------------------------------
+                     */
 
                     const friendMentioned =
                         message.mentions.users.has(
@@ -328,7 +295,9 @@ export default {
 
 
                     /*
-                     * REACT WHEN TARGET IS MENTIONED
+                     * ------------------------------------------------------------------
+                     * REACT WHEN YOU ARE MENTIONED
+                     * ------------------------------------------------------------------
                      */
 
                     if (targetMentioned) {
@@ -357,7 +326,9 @@ export default {
 
 
                     /*
+                     * ------------------------------------------------------------------
                      * REACT WHEN FRIEND IS MENTIONED
+                     * ------------------------------------------------------------------
                      */
 
                     if (friendMentioned) {
@@ -392,6 +363,16 @@ export default {
              * ==========================================================================
              * BAD WORD FILTER
              * ==========================================================================
+             *
+             * BAD WORD MESSAGE:
+             *
+             * 1. Message is detected.
+             * 2. Message is deleted.
+             * 3. No public warning is sent.
+             * 4. No DM is sent.
+             * 5. No other message systems continue processing it.
+             *
+             * ==========================================================================
              */
 
             const badWords = [
@@ -423,6 +404,12 @@ export default {
 
                 try {
 
+                    /*
+                     * ------------------------------------------------------------------
+                     * DELETE BAD WORD MESSAGE ONLY
+                     * ------------------------------------------------------------------
+                     */
+
                     await message.delete()
                         .catch(() => {});
 
@@ -433,6 +420,15 @@ export default {
                         error
                     );
                 }
+
+                /*
+                 * Stop processing this message.
+                 *
+                 * This prevents:
+                 * - counting
+                 * - prefix commands
+                 * - other message processing
+                 */
 
                 return;
             }
@@ -529,7 +525,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * MUSIC SHORTCUTS
+         * ----------------------------------------------------------------------
          */
 
         const musicPrefixShortcut =
@@ -565,7 +563,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * RESOLVE COMMAND
+         * ----------------------------------------------------------------------
          */
 
         const resolvedCommandName =
@@ -593,7 +593,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * MAINTENANCE
+         * ----------------------------------------------------------------------
          */
 
         if (
@@ -621,7 +623,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * CATEGORY
+         * ----------------------------------------------------------------------
          */
 
         if (
@@ -648,7 +652,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * PREFIX RESTRICTION
+         * ----------------------------------------------------------------------
          */
 
         const restriction =
@@ -688,7 +694,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * COMMAND ENABLED
+         * ----------------------------------------------------------------------
          */
 
         const accessKey =
@@ -724,7 +732,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * ABUSE PROTECTION
+         * ----------------------------------------------------------------------
          */
 
         const mockInteractionForProtection = {
@@ -768,7 +778,9 @@ async function handlePrefixCommand(
 
 
         /*
+         * ----------------------------------------------------------------------
          * EXECUTE COMMAND
+         * ----------------------------------------------------------------------
          */
 
         logger.info(
@@ -784,6 +796,7 @@ async function handlePrefixCommand(
             guildConfig
         );
 
+
     } catch (error) {
 
         logger.error(
@@ -798,6 +811,25 @@ async function handlePrefixCommand(
  * ==========================================================================
  * COUNTING GAME
  * ==========================================================================
+ *
+ * WRONG COUNT BEHAVIOR:
+ *
+ * 1
+ * 2
+ * 3
+ * 8  <- WRONG
+ *
+ * 8 is deleted.
+ *
+ * The game continues:
+ *
+ * 4
+ * 5
+ * 6
+ *
+ * It does NOT reset to 1.
+ *
+ * ==========================================================================
  */
 
 async function handleCountingGame(
@@ -807,6 +839,12 @@ async function handleCountingGame(
 
     try {
 
+        /*
+         * ----------------------------------------------------------------------
+         * GET COUNTING CONFIG
+         * ----------------------------------------------------------------------
+         */
+
         const config =
             await getCountingGameConfig(
                 client,
@@ -815,7 +853,9 @@ async function handleCountingGame(
 
 
         /*
+         * ----------------------------------------------------------------------
          * CHECK IF COUNTING GAME IS ACTIVE
+         * ----------------------------------------------------------------------
          */
 
         if (
@@ -830,7 +870,9 @@ async function handleCountingGame(
 
 
         /*
+         * ----------------------------------------------------------------------
          * GET MESSAGE CONTENT
+         * ----------------------------------------------------------------------
          */
 
         const content =
@@ -838,7 +880,9 @@ async function handleCountingGame(
 
 
         /*
+         * ----------------------------------------------------------------------
          * CHECK NUMBER
+         * ----------------------------------------------------------------------
          */
 
         const validCount =
@@ -849,7 +893,20 @@ async function handleCountingGame(
 
 
         /*
+         * ----------------------------------------------------------------------
          * CHECK SAME USER
+         * ----------------------------------------------------------------------
+         *
+         * The same person cannot count twice consecutively.
+         *
+         * Example:
+         *
+         * User A: 1
+         * User A: 2 <- deleted
+         *
+         * The sequence does NOT reset.
+         *
+         * ----------------------------------------------------------------------
          */
 
         const sameUserAttempt =
@@ -858,7 +915,9 @@ async function handleCountingGame(
 
 
         /*
+         * ----------------------------------------------------------------------
          * WRONG COUNT OR SAME USER
+         * ----------------------------------------------------------------------
          */
 
         if (
@@ -866,16 +925,22 @@ async function handleCountingGame(
             sameUserAttempt
         ) {
 
+            /*
+             * Delete ONLY the incorrect message.
+             */
+
             await message.delete()
                 .catch(() => {});
 
 
             /*
-             * DO NOT RESET:
+             * DO NOT reset:
              *
-             * nextNumber
-             * lastUserId
-             * currentStreak
+             * - nextNumber
+             * - lastUserId
+             * - currentStreak
+             *
+             * The current counting position remains unchanged.
              */
 
             const expectedNumber =
@@ -883,7 +948,9 @@ async function handleCountingGame(
 
 
             /*
+             * ------------------------------------------------------------------
              * SEND TEMPORARY WARNING
+             * ------------------------------------------------------------------
              */
 
             const warningMessage =
@@ -898,7 +965,7 @@ async function handleCountingGame(
 
 
             /*
-             * DELETE WARNING AFTER 5 SECONDS
+             * Delete warning after 5 seconds.
              */
 
             if (warningMessage) {
@@ -913,14 +980,18 @@ async function handleCountingGame(
             }
 
 
+            /*
+             * Counting message handled.
+             */
+
             return true;
         }
 
 
         /*
-         * ==========================================================================
+         * ----------------------------------------------------------------------
          * CORRECT COUNT
-         * ==========================================================================
+         * ----------------------------------------------------------------------
          */
 
         await recordCorrectCount(
@@ -931,7 +1002,9 @@ async function handleCountingGame(
 
 
         /*
+         * ----------------------------------------------------------------------
          * DONE
+         * ----------------------------------------------------------------------
          */
 
         return true;
