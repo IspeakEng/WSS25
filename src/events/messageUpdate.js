@@ -5,8 +5,6 @@ import {
 
 import { logger } from '../utils/logger.js';
 
-const LOG_CHANNEL_ID = '1541753459672350770';
-
 export default {
     name: Events.MessageUpdate,
 
@@ -19,6 +17,16 @@ export default {
 
             // Ignore bot messages
             if (newMessage.author?.bot) {
+                return;
+            }
+
+            // Get message log configuration
+            const config = await client.db.get(
+                `msglog:${newMessage.guild.id}`,
+                null
+            );
+
+            if (!config?.channelId) {
                 return;
             }
 
@@ -50,14 +58,23 @@ export default {
             let newContent =
                 newMessage.content?.trim() || '*Empty*';
 
-            // Discord embed field limit protection
+            // Prevent Discord embed field overflow
             if (oldContent.length > 900) {
-                oldContent = oldContent.slice(0, 897) + '...';
+                oldContent =
+                    oldContent.slice(0, 897) + '...';
             }
 
             if (newContent.length > 900) {
-                newContent = newContent.slice(0, 897) + '...';
+                newContent =
+                    newContent.slice(0, 897) + '...';
             }
+
+            // Protect markdown/backticks
+            oldContent =
+                oldContent.replace(/`/g, "'");
+
+            newContent =
+                newContent.replace(/`/g, "'");
 
             const embed = new EmbedBuilder()
                 .setTitle('✏️ Message Edited')
@@ -71,7 +88,9 @@ export default {
                 .addFields(
                     {
                         name: '👤 User',
-                        value: `<@${newMessage.author.id}>`,
+                        value: newMessage.author
+                            ? `<@${newMessage.author.id}>`
+                            : '*Unknown*',
                         inline: true,
                     },
                     {
@@ -86,14 +105,14 @@ export default {
                     },
                     {
                         name: 'Before',
-                        value: `\`${oldContent.replace(/`/g, "'")}\``,
+                        value: `\`${oldContent}\``,
                         inline: false,
                     },
                     {
                         name: 'After',
-                        value: `\`${newContent.replace(/`/g, "'")}\``,
+                        value: `\`${newContent}\``,
                         inline: false,
-                    },
+                    }
                 )
                 .setFooter({
                     text: `Message ID: ${newMessage.id}`,
@@ -101,17 +120,22 @@ export default {
                 .setTimestamp();
 
             // Get log channel
-            const logChannel = await client.channels.fetch(
-                LOG_CHANNEL_ID
-            );
+            const logChannel =
+                await client.channels.fetch(
+                    config.channelId
+                ).catch(() => null);
 
-            // Make sure the channel can receive messages
-            if (!logChannel || !logChannel.isTextBased()) {
-                logger.error('Log channel not found or is not text-based.');
+            if (
+                !logChannel ||
+                !logChannel.isTextBased()
+            ) {
+                logger.error(
+                    `Message log channel not found for guild ${newMessage.guild.id}`
+                );
                 return;
             }
 
-            // Send log to channel
+            // Send log
             await logChannel.send({
                 embeds: [embed],
             });
