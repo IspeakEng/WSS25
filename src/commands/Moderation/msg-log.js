@@ -8,19 +8,22 @@ import {
 export default {
     data: new SlashCommandBuilder()
         .setName('msg-log')
-        .setDescription('Set the message delete/edit log channel')
+        .setDescription('Set the message edit/delete log channel')
         .addChannelOption(option =>
             option
                 .setName('channel')
-                .setDescription('Channel where deleted/edited messages will be logged')
+                .setDescription('The channel where message logs will be sent')
                 .addChannelTypes(ChannelType.GuildText)
                 .setRequired(true)
         )
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDefaultMemberPermissions(
+            PermissionFlagsBits.Administrator
+        ),
 
     async execute(interaction, guildConfig, client) {
         try {
-            const channel = interaction.options.getChannel('channel');
+            const channel =
+                interaction.options.getChannel('channel');
 
             if (!channel) {
                 return interaction.reply({
@@ -29,52 +32,67 @@ export default {
                 });
             }
 
-            // Save config in your existing database
-            const key = `msglog:${interaction.guild.id}`;
-
-            await client.db.set(key, {
-                channelId: channel.id,
-                ownerId: interaction.guild.ownerId,
-            });
+            // Save log channel
+            await client.db.set(
+                `msglog:${interaction.guild.id}`,
+                {
+                    channelId: channel.id,
+                    setBy: interaction.user.id,
+                }
+            );
 
             // Make channel private
-            try {
-                await channel.permissionOverwrites.edit(
-                    interaction.guild.roles.everyone,
-                    {
-                        ViewChannel: false,
-                    }
-                );
+            await channel.permissionOverwrites.edit(
+                interaction.guild.roles.everyone,
+                {
+                    ViewChannel: false,
+                }
+            );
 
+            // Allow ONLY the person who configured it
+            await channel.permissionOverwrites.edit(
+                interaction.user.id,
+                {
+                    ViewChannel: true,
+                    ReadMessageHistory: true,
+                    SendMessages: false,
+                }
+            );
+
+            // Allow bot to see/send messages
+            const botMember =
+                interaction.guild.members.me;
+
+            if (botMember) {
                 await channel.permissionOverwrites.edit(
-                    interaction.user.id,
+                    botMember.id,
                     {
                         ViewChannel: true,
+                        SendMessages: true,
                         ReadMessageHistory: true,
-                        SendMessages: false,
+                        EmbedLinks: true,
                     }
-                );
-            } catch (permissionError) {
-                console.error(
-                    'Failed to configure msg-log permissions:',
-                    permissionError
                 );
             }
 
             await interaction.reply({
                 content:
                     `✅ Message log channel set to ${channel}.\n` +
-                    `🗑️ Deleted messages and ✏️ edited messages will be logged there.\n` +
-                    `🔒 The channel is hidden from @everyone.`,
+                    `🔒 ${channel} is now private.\n` +
+                    `🗑️ Deleted and ✏️ edited messages will be logged here.`,
                 flags: MessageFlags.Ephemeral,
             });
 
         } catch (error) {
-            console.error('msg-log command error:', error);
+            console.error(
+                'Error in /msg-log:',
+                error
+            );
 
-            if (!interaction.replied && !interaction.deferred) {
+            if (!interaction.replied) {
                 await interaction.reply({
-                    content: '❌ Failed to configure message logging.',
+                    content:
+                        '❌ Failed to configure the message log channel.',
                     flags: MessageFlags.Ephemeral,
                 }).catch(() => {});
             }
