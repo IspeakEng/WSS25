@@ -48,47 +48,32 @@ import {
 } from '../services/countingGameService.js';
 
 
-/*
- * ==========================================================================
- * AUTO MENTION REACTION CONFIG
- * ==========================================================================
- */
+// ============================================================
+// AUTO MENTION REACTION CONFIG
+// ============================================================
 
-// YOUR Discord User ID
 const TARGET_USER_ID = '1054967242497982476';
 
-// Your custom emoji ID
 const TARGET_REACTION_EMOJIS = [
     '💗',
 ];
 
-
-// FRIEND'S Discord User ID
 const FRIEND_USER_ID = '1498287924301795388';
 
-// Friend reaction emoji
 const FRIEND_REACTION_EMOJI = '💖';
 
 
-/*
- * ==========================================================================
- * MESSAGE CREATE
- * ==========================================================================
- */
+// ============================================================
+// MESSAGE CREATE
+// ============================================================
 
 export default {
     name: Events.MessageCreate,
 
     async execute(message, client) {
-
         try {
 
-            /*
-             * ----------------------------------------------------------------------
-             * IGNORE BOTS AND DMs
-             * ----------------------------------------------------------------------
-             */
-
+            // Ignore bots and DMs
             if (
                 message.author.bot ||
                 !message.guild
@@ -97,23 +82,67 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * AFK SYSTEM
-             * ==========================================================================
-             */
+            // ====================================================
+            // MESSAGE LOG CACHE
+            // ====================================================
+            // Needed because after a message is deleted,
+            // Discord may no longer provide its content.
 
             try {
+                if (!client.messageLogCache) {
+                    client.messageLogCache = new Map();
+                }
 
+                client.messageLogCache.set(
+                    message.id,
+                    {
+                        content: message.content || '',
+                        authorId: message.author.id,
+                        guildId: message.guild.id,
+                        channelId: message.channel.id,
+                        createdTimestamp:
+                            message.createdTimestamp,
+                    }
+                );
+
+                // Prevent unlimited memory usage
+                if (
+                    client.messageLogCache.size >
+                    10000
+                ) {
+                    const firstKey =
+                        client.messageLogCache
+                            .keys()
+                            .next()
+                            .value;
+
+                    if (firstKey) {
+                        client.messageLogCache.delete(
+                            firstKey
+                        );
+                    }
+                }
+
+            } catch (error) {
+                logger.error(
+                    'Failed to cache message for message logging:',
+                    error
+                );
+            }
+
+
+            // ====================================================
+            // AFK SYSTEM
+            // ====================================================
+
+            try {
                 const { getAFKKey } =
-                    await import('../utils/database.js');
+                    await import(
+                        '../utils/database.js'
+                    );
 
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * REMOVE AFK WHEN AFK USER SENDS A MESSAGE
-                 * ----------------------------------------------------------------------
-                 */
+                // Remove AFK when AFK user sends a message
 
                 const authorAFKKey =
                     getAFKKey(
@@ -140,23 +169,16 @@ export default {
                         }).catch(() => null);
 
                     if (welcomeBack) {
-
                         setTimeout(() => {
-
                             welcomeBack
                                 .delete()
                                 .catch(() => {});
-
                         }, 5000);
                     }
                 }
 
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * CHECK MENTIONED USERS FOR AFK STATUS
-                 * ----------------------------------------------------------------------
-                 */
+                // Check mentioned users for AFK
 
                 for (
                     const [, mentionedUser]
@@ -205,12 +227,9 @@ export default {
                             typeof afkData.timestamp ===
                             'number'
                         ) {
-
                             timestampMs =
                                 afkData.timestamp;
-
                         } else {
-
                             timestampMs =
                                 Date.parse(
                                     afkData.timestamp
@@ -218,9 +237,10 @@ export default {
                         }
 
                         if (
-                            Number.isFinite(timestampMs)
+                            Number.isFinite(
+                                timestampMs
+                            )
                         ) {
-
                             timestampText =
                                 `<t:${Math.floor(
                                     timestampMs / 1000
@@ -237,7 +257,6 @@ export default {
                 }
 
             } catch (error) {
-
                 logger.error(
                     'Error handling AFK system:',
                     error
@@ -245,48 +264,19 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * AUTO MENTION REACTIONS
-             * ==========================================================================
-             *
-             * Reactions ONLY happen on normal messages.
-             *
-             * If the message is a REPLY, reactions are skipped.
-             *
-             * Other systems like AFK, bad words, counting and commands
-             * will still continue normally.
-             *
-             * ==========================================================================
-             */
+            // ====================================================
+            // AUTO MENTION REACTIONS
+            // ====================================================
 
             try {
 
-                /*
-                 * ----------------------------------------------------------------------
-                 * ONLY RUN AUTO REACTION IF THIS IS NOT A REPLY
-                 * ----------------------------------------------------------------------
-                 */
-
+                // Don't react to replies
                 if (!message.reference) {
-
-                    /*
-                     * ------------------------------------------------------------------
-                     * CHECK IF YOU WERE MENTIONED
-                     * ------------------------------------------------------------------
-                     */
 
                     const targetMentioned =
                         message.mentions.users.has(
                             TARGET_USER_ID
                         );
-
-
-                    /*
-                     * ------------------------------------------------------------------
-                     * CHECK IF FRIEND WAS MENTIONED
-                     * ------------------------------------------------------------------
-                     */
 
                     const friendMentioned =
                         message.mentions.users.has(
@@ -294,11 +284,7 @@ export default {
                         );
 
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * REACT WHEN YOU ARE MENTIONED
-                     * ------------------------------------------------------------------
-                     */
+                    // React when target user is mentioned
 
                     if (targetMentioned) {
 
@@ -325,11 +311,7 @@ export default {
                     }
 
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * REACT WHEN FRIEND IS MENTIONED
-                     * ------------------------------------------------------------------
-                     */
+                    // React when friend is mentioned
 
                     if (friendMentioned) {
 
@@ -338,7 +320,9 @@ export default {
                         );
 
                         await message
-                            .react(FRIEND_REACTION_EMOJI)
+                            .react(
+                                FRIEND_REACTION_EMOJI
+                            )
                             .catch(error => {
 
                                 logger.error(
@@ -351,7 +335,6 @@ export default {
                 }
 
             } catch (error) {
-
                 logger.error(
                     '❌ Failed to handle auto mention reactions:',
                     error
@@ -359,21 +342,9 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * BAD WORD FILTER
-             * ==========================================================================
-             *
-             * BAD WORD MESSAGE:
-             *
-             * 1. Message is detected.
-             * 2. Message is deleted.
-             * 3. No public warning is sent.
-             * 4. No DM is sent.
-             * 5. No other message systems continue processing it.
-             *
-             * ==========================================================================
-             */
+            // ====================================================
+            // BAD WORD FILTER
+            // ====================================================
 
             const badWords = [
                 'fuck',
@@ -404,12 +375,6 @@ export default {
 
                 try {
 
-                    /*
-                     * ------------------------------------------------------------------
-                     * DELETE BAD WORD MESSAGE ONLY
-                     * ------------------------------------------------------------------
-                     */
-
                     await message.delete()
                         .catch(() => {});
 
@@ -419,37 +384,25 @@ export default {
                         'Failed to delete bad word message:',
                         error
                     );
-                }
 
-                /*
-                 * Stop processing this message.
-                 *
-                 * This prevents:
-                 * - counting
-                 * - prefix commands
-                 * - other message processing
-                 */
+                }
 
                 return;
             }
 
 
-            /*
-             * ==========================================================================
-             * MESSAGE LOG
-             * ==========================================================================
-             */
+            // ====================================================
+            // MESSAGE LOG DEBUG
+            // ====================================================
 
             logger.debug(
                 `Message received from ${message.author.tag}: ${message.content}`
             );
 
 
-            /*
-             * ==========================================================================
-             * COUNTING GAME
-             * ==========================================================================
-             */
+            // ====================================================
+            // COUNTING GAME
+            // ====================================================
 
             const countingProcessed =
                 await handleCountingGame(
@@ -462,11 +415,9 @@ export default {
             }
 
 
-            /*
-             * ==========================================================================
-             * PREFIX COMMAND
-             * ==========================================================================
-             */
+            // ====================================================
+            // PREFIX COMMAND
+            // ====================================================
 
             await handlePrefixCommand(
                 message,
@@ -480,16 +431,15 @@ export default {
                 'Error in messageCreate event:',
                 error
             );
+
         }
     },
 };
 
 
-/*
- * ==========================================================================
- * PREFIX COMMAND
- * ==========================================================================
- */
+// ============================================================
+// PREFIX COMMAND
+// ============================================================
 
 async function handlePrefixCommand(
     message,
@@ -524,11 +474,9 @@ async function handlePrefixCommand(
         } = parsed;
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * MUSIC SHORTCUTS
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // MUSIC PREFIX SHORTCUTS
+        // ====================================================
 
         const musicPrefixShortcut =
             commandName.toLowerCase();
@@ -557,16 +505,15 @@ async function handlePrefixCommand(
             ];
         }
 
+
         logger.info(
             `Prefix command detected: ${commandName}, args: ${args.join(', ')}`
         );
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * RESOLVE COMMAND
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // RESOLVE COMMAND
+        // ====================================================
 
         const resolvedCommandName =
             resolveCommandAlias(
@@ -592,11 +539,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * MAINTENANCE
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // MAINTENANCE
+        // ====================================================
 
         if (
             isMaintenanceMode() &&
@@ -622,11 +567,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CATEGORY
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // CATEGORY
+        // ====================================================
 
         if (
             !isCommandCategoryEnabled(
@@ -651,11 +594,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * PREFIX RESTRICTION
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // PREFIX RESTRICTION
+        // ====================================================
 
         const restriction =
             getPrefixRestriction(
@@ -678,9 +619,12 @@ async function handlePrefixCommand(
 
                 const embed =
                     createEmbed({
-                        title: 'Slash Command Only',
+                        title:
+                            'Slash Command Only',
+
                         description:
                             `${restriction.reason}\nUse \`/${resolvedCommandName}\` instead.`,
+
                         color: 'info',
                     });
 
@@ -693,11 +637,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * COMMAND ENABLED
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // COMMAND ENABLED
+        // ====================================================
 
         const accessKey =
             resolvePrefixAccessKey(
@@ -717,9 +659,12 @@ async function handlePrefixCommand(
 
             const embed =
                 createEmbed({
-                    title: 'Command Disabled',
+                    title:
+                        'Command Disabled',
+
                     description:
                         'This command has been disabled for this server.',
+
                     color: 'error',
                 });
 
@@ -731,11 +676,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * ABUSE PROTECTION
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // ABUSE PROTECTION
+        // ====================================================
 
         const mockInteractionForProtection = {
             guildId:
@@ -763,9 +706,12 @@ async function handlePrefixCommand(
 
             const embed =
                 createEmbed({
-                    title: 'Command Cooldown',
+                    title:
+                        'Command Cooldown',
+
                     description:
                         `This command is on cooldown. Please wait ${formattedCooldown} before trying again.`,
+
                     color: 'error',
                 });
 
@@ -777,11 +723,9 @@ async function handlePrefixCommand(
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * EXECUTE COMMAND
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // EXECUTE PREFIX COMMAND
+        // ====================================================
 
         logger.info(
             `Executing prefix command: ${prefix}${commandName} (resolved to ${resolvedCommandName}) by ${message.author.tag}`
@@ -803,34 +747,14 @@ async function handlePrefixCommand(
             'Error handling prefix command:',
             error
         );
+
     }
 }
 
 
-/*
- * ==========================================================================
- * COUNTING GAME
- * ==========================================================================
- *
- * WRONG COUNT BEHAVIOR:
- *
- * 1
- * 2
- * 3
- * 8  <- WRONG
- *
- * 8 is deleted.
- *
- * The game continues:
- *
- * 4
- * 5
- * 6
- *
- * It does NOT reset to 1.
- *
- * ==========================================================================
- */
+// ============================================================
+// COUNTING GAME
+// ============================================================
 
 async function handleCountingGame(
     message,
@@ -839,11 +763,7 @@ async function handleCountingGame(
 
     try {
 
-        /*
-         * ----------------------------------------------------------------------
-         * GET COUNTING CONFIG
-         * ----------------------------------------------------------------------
-         */
+        // Get counting configuration
 
         const config =
             await getCountingGameConfig(
@@ -851,12 +771,7 @@ async function handleCountingGame(
                 message.guild.id
             );
 
-
-        /*
-         * ----------------------------------------------------------------------
-         * CHECK IF COUNTING GAME IS ACTIVE
-         * ----------------------------------------------------------------------
-         */
+        // Check if counting game is active
 
         if (
             !config.enabled ||
@@ -864,26 +779,17 @@ async function handleCountingGame(
             message.channel.id !==
                 config.channelId
         ) {
-
             return false;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * GET MESSAGE CONTENT
-         * ----------------------------------------------------------------------
-         */
+        // Get message content
 
         const content =
             message.content.trim();
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CHECK NUMBER
-         * ----------------------------------------------------------------------
-         */
+        // Check number
 
         const validCount =
             isValidCountingMessage(
@@ -892,66 +798,35 @@ async function handleCountingGame(
             );
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CHECK SAME USER
-         * ----------------------------------------------------------------------
-         *
-         * The same person cannot count twice consecutively.
-         *
-         * Example:
-         *
-         * User A: 1
-         * User A: 2 <- deleted
-         *
-         * The sequence does NOT reset.
-         *
-         * ----------------------------------------------------------------------
-         */
+        // Same user cannot count twice
 
         const sameUserAttempt =
             message.author.id ===
             config.lastUserId;
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * WRONG COUNT OR SAME USER
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // WRONG COUNT OR SAME USER
+        // ====================================================
 
         if (
             !validCount ||
             sameUserAttempt
         ) {
 
-            /*
-             * Delete ONLY the incorrect message.
-             */
+            // Delete incorrect message
 
             await message.delete()
                 .catch(() => {});
 
 
-            /*
-             * DO NOT reset:
-             *
-             * - nextNumber
-             * - lastUserId
-             * - currentStreak
-             *
-             * The current counting position remains unchanged.
-             */
+            // Keep current counting position
 
             const expectedNumber =
                 config.nextNumber;
 
 
-            /*
-             * ------------------------------------------------------------------
-             * SEND TEMPORARY WARNING
-             * ------------------------------------------------------------------
-             */
+            // Send temporary warning
 
             const warningMessage =
                 await message.channel.send({
@@ -964,9 +839,7 @@ async function handleCountingGame(
                 }).catch(() => null);
 
 
-            /*
-             * Delete warning after 5 seconds.
-             */
+            // Delete warning after 5 seconds
 
             if (warningMessage) {
 
@@ -980,19 +853,13 @@ async function handleCountingGame(
             }
 
 
-            /*
-             * Counting message handled.
-             */
-
             return true;
         }
 
 
-        /*
-         * ----------------------------------------------------------------------
-         * CORRECT COUNT
-         * ----------------------------------------------------------------------
-         */
+        // ====================================================
+        // CORRECT COUNT
+        // ====================================================
 
         await recordCorrectCount(
             client,
@@ -1000,12 +867,6 @@ async function handleCountingGame(
             message.author.id
         );
 
-
-        /*
-         * ----------------------------------------------------------------------
-         * DONE
-         * ----------------------------------------------------------------------
-         */
 
         return true;
 
