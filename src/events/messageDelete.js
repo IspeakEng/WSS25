@@ -5,8 +5,6 @@ import {
 
 import { logger } from '../utils/logger.js';
 
-const LOG_CHANNEL_ID = '1541753459672350770';
-
 export default {
     name: Events.MessageDelete,
 
@@ -22,36 +20,70 @@ export default {
                 return;
             }
 
-            // Fetch partial message
-            if (message.partial) {
-                try {
-                    await message.fetch();
-                } catch {
-                    return;
-                }
+            // Get message log configuration
+            const config = await client.db.get(
+                `msglog:${message.guild.id}`,
+                null
+            );
+
+            if (!config?.channelId) {
+                return;
             }
+
+            // Get cached message data
+            const cachedMessage =
+                client.messageLogCache?.get(
+                    message.id
+                );
 
             let content =
-                message.content?.trim() || '*No text content*';
+                cachedMessage?.content ||
+                message.content ||
+                '*No text content available*';
 
+            content = content.trim();
+
+            // Limit Discord embed field size
             if (content.length > 1000) {
-                content = content.slice(0, 997) + '...';
+                content =
+                    content.slice(0, 997) + '...';
             }
+
+            // Protect markdown/backticks
+            content =
+                content.replace(/`/g, "'");
+
+            const authorId =
+                cachedMessage?.authorId ||
+                message.author?.id;
+
+            const channelId =
+                cachedMessage?.channelId ||
+                message.channel?.id;
 
             const embed = new EmbedBuilder()
                 .setTitle('🗑️ Message Deleted')
                 .setColor(0xED4245)
                 .setThumbnail(
-                    message.author?.displayAvatarURL({
-                        dynamic: true,
-                        size: 128,
-                    }) || null
+                    authorId
+                        ? (
+                            await message.guild.members
+                                .fetch(authorId)
+                                .then(member =>
+                                    member.user.displayAvatarURL({
+                                        dynamic: true,
+                                        size: 128,
+                                    })
+                                )
+                                .catch(() => null)
+                        )
+                        : null
                 )
                 .addFields(
                     {
                         name: '👤 User',
-                        value: message.author
-                            ? `<@${message.author.id}>`
+                        value: authorId
+                            ? `<@${authorId}>`
                             : '*Unknown*',
                         inline: true,
                     },
@@ -62,14 +94,16 @@ export default {
                     },
                     {
                         name: '💬 Channel',
-                        value: `<#${message.channel.id}>`,
+                        value: channelId
+                            ? `<#${channelId}>`
+                            : '*Unknown*',
                         inline: true,
                     },
                     {
                         name: 'Deleted Content',
-                        value: `\`${content.replace(/`/g, "'")}\``,
+                        value: `\`${content}\``,
                         inline: false,
-                    },
+                    }
                 )
                 .setFooter({
                     text: `Message ID: ${message.id}`,
@@ -77,20 +111,32 @@ export default {
                 .setTimestamp();
 
             // Get log channel
-            const logChannel = await client.channels.fetch(
-                LOG_CHANNEL_ID
-            );
+            const logChannel =
+                await client.channels.fetch(
+                    config.channelId
+                ).catch(() => null);
 
-            // Make sure the channel can receive messages
-            if (!logChannel || !logChannel.isTextBased()) {
-                logger.error('Log channel not found or is not text-based.');
+            if (
+                !logChannel ||
+                !logChannel.isTextBased()
+            ) {
+                logger.error(
+                    `Message log channel not found for guild ${message.guild.id}`
+                );
                 return;
             }
 
-            // Send log to channel
+            // Send log
             await logChannel.send({
                 embeds: [embed],
             });
+
+            // Remove from cache
+            if (client.messageLogCache) {
+                client.messageLogCache.delete(
+                    message.id
+                );
+            }
 
         } catch (error) {
             logger.error(
