@@ -64,6 +64,17 @@ const FRIEND_REACTION_EMOJI = '💖';
 
 
 // ============================================================
+// AUTO-THREAD CONFIG
+// ============================================================
+
+// Global variable to store auto-thread channels
+// Initialize if not already set
+if (!global.autoThreadChannels) {
+    global.autoThreadChannels = [];
+}
+
+
+// ============================================================
 // MESSAGE CREATE
 // ============================================================
 
@@ -388,6 +399,42 @@ export default {
                 }
 
                 return;
+            }
+
+
+            // ====================================================
+            // AUTO-THREAD SYSTEM (NEW FEATURE)
+            // ====================================================
+
+            try {
+                // Check if this channel is set for auto-threads
+                if (global.autoThreadChannels && global.autoThreadChannels.includes(message.channel.id)) {
+                    
+                    // Check if message has media (images, videos, GIFs)
+                    const hasMedia = message.attachments.size > 0;
+                    
+                    if (hasMedia) {
+                        // Thread name
+                        const threadName = `${message.author.username}'s Media`;
+
+                        // Create thread
+                        const thread = await message.startThread({
+                            name: threadName,
+                            autoArchiveDuration: 1440 // 24 hours
+                        });
+
+                        // Welcome message in thread
+                        await thread.send(`🎉 **${message.author}** shared media!\n⏰ This thread will archive after 24 hours.`);
+
+                        logger.info(`✅ Auto-thread created: ${thread.name} in #${message.channel.name}`);
+                    }
+                }
+
+            } catch (error) {
+                logger.error(
+                    '❌ Failed to create auto-thread:',
+                    error
+                );
             }
 
 
