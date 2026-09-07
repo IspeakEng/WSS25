@@ -1,4 +1,4 @@
-import { Events, MessageFlags, EmbedBuilder } from 'discord.js';
+import { Events, MessageFlags } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getGuildConfig } from '../services/config/guildConfig.js';
 import {
@@ -19,7 +19,6 @@ import { resolveSlashAccessKey } from '../utils/messageAdapter.js';
 import { isCollectorManagedComponent } from '../utils/collectorComponents.js';
 import { ResponseCoordinator } from '../utils/responseCoordinator.js';
 import { enforceDefaultCommandPermissions } from '../utils/permissionGuard.js';
-import { hasPermission } from '../utils/permissionManager.js';
 
 const COMMAND_ERROR_SUBTYPES = {
   warn: 'warn_failed',
@@ -84,40 +83,6 @@ export default {
                 withTraceContext({ commandName: interaction.commandName }, interactionTraceContext)
               );
             }
-
-            // ============================================================
-            // 🔐 PERMISSION CHECK - NEW CODE
-            // ============================================================
-            // Skip permission check for 'perm' command (handled separately)
-            if (interaction.commandName !== 'perm') {
-              // Check if user is admin
-              const isAdmin = interaction.member?.permissions?.has('Administrator') || false;
-              
-              // If not admin, check if they have permission for this command
-              if (!isAdmin) {
-                const hasPerm = await hasPermission(interaction.user.id, interaction.commandName);
-                
-                if (!hasPerm) {
-                  const embed = new EmbedBuilder()
-                    .setTitle('❌ Permission Denied')
-                    .setDescription(
-                      `You don't have permission to use \`${interaction.commandName}\`!\n\n` +
-                      `**How to get permission:**\n` +
-                      `Ask a server admin to run:\n` +
-                      `\`/perm give @${interaction.user.username} ${interaction.commandName}\``
-                    )
-                    .setColor(0xff0000)
-                    .setFooter({ text: 'Admins have all permissions automatically' });
-                  
-                  return await interaction.reply({ 
-                    embeds: [embed], 
-                    ephemeral: true,
-                    flags: MessageFlags.Ephemeral
-                  });
-                }
-              }
-            }
-            // ============================================================
 
             if (isMaintenanceMode() && !isBotOwner(interaction.user.id)) {
               throw createError(
@@ -342,92 +307,6 @@ export default {
             }
           }
         } else if (interaction.isButton()) {
-          // ============================================================
-          // ROLE TOGGLE BUTTON HANDLER (EXCLUSIVE VERSION)
-          // ============================================================
-          if (interaction.customId.startsWith('toggle_role_')) {
-            try {
-              await interaction.deferReply({ ephemeral: true });
-
-              const roleId = interaction.customId.replace('toggle_role_', '');
-              const role = interaction.guild.roles.cache.get(roleId);
-              const member = interaction.member;
-
-              if (!role) {
-                return interaction.editReply('❌ Role not found!');
-              }
-
-              const botMember = interaction.guild.members.me;
-              if (botMember.roles.highest.position <= role.position) {
-                return interaction.editReply('❌ My role is below the target role! Please move my role above.');
-              }
-
-              // ========== EXCLUSIVE GROUPS ==========
-              const exclusiveGroups = {
-                'pronouns': ['He/Him', 'She/Her', 'They/Them'],
-                'gender': ['Male', 'Female', 'Non-Binary'],
-                'region': ['Asia', 'Europe', 'America', 'Africa']
-              };
-              // =====================================
-
-              // Check if this role is in any exclusive group
-              let isExclusive = false;
-              let groupRoles = [];
-
-              for (const [groupName, roles] of Object.entries(exclusiveGroups)) {
-                if (roles.includes(role.name)) {
-                  isExclusive = true;
-                  groupRoles = roles;
-                  break;
-                }
-              }
-
-              // If exclusive role
-              if (isExclusive) {
-                // Remove all other roles from this group
-                const rolesToRemove = member.roles.cache.filter(r => 
-                  groupRoles.includes(r.name) && r.id !== role.id
-                );
-
-                for (const r of rolesToRemove.values()) {
-                  await member.roles.remove(r);
-                }
-
-                // If user already has this role, remove it
-                if (member.roles.cache.has(roleId)) {
-                  await member.roles.remove(role);
-                  await interaction.editReply(`✅ **${role.name}** role has been removed!`);
-                  return;
-                }
-
-                // Add the role
-                await member.roles.add(role);
-                await interaction.editReply(`✅ **${role.name}** role has been added!`);
-                return;
-              }
-
-              // Normal toggle (non-exclusive)
-              if (member.roles.cache.has(roleId)) {
-                await member.roles.remove(role);
-                await interaction.editReply(`✅ **${role.name}** role has been removed!`);
-              } else {
-                await member.roles.add(role);
-                await interaction.editReply(`✅ **${role.name}** role has been added!`);
-              }
-
-            } catch (error) {
-              logger.error('Role toggle button error:', {
-                error: error.message,
-                guildId: interaction.guildId,
-                userId: interaction.user?.id,
-                customId: interaction.customId
-              });
-              await interaction.editReply('❌ Failed to toggle role!').catch(() => {});
-            }
-            return;
-          }
-          // ============================================================
-
           if (interaction.customId.startsWith('shared_todo_')) {
             const parts = interaction.customId.split('_');
             const buttonType = parts.slice(0, 3).join('_');
