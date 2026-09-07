@@ -1,6 +1,7 @@
-const { SlashCommandBuilder, ChannelType, PermissionsBitField } = require('discord.js');
+import { SlashCommandBuilder, ChannelType, PermissionsBitField } from 'discord.js';
+import { logger } from '../../utils/logger.js';
 
-module.exports = {
+export default {
     data: new SlashCommandBuilder()
         .setName('set_auto_thread')
         .setDescription('Set a channel for auto-thread creation on media uploads')
@@ -39,7 +40,9 @@ module.exports = {
             });
 
             // Save channel ID (in memory)
-            global.autoThreadChannels = global.autoThreadChannels || [];
+            if (!global.autoThreadChannels) {
+                global.autoThreadChannels = [];
+            }
             if (!global.autoThreadChannels.includes(channel.id)) {
                 global.autoThreadChannels.push(channel.id);
             }
@@ -50,7 +53,10 @@ module.exports = {
                         `⏰ Archive time: 24 hours`
             });
 
+            logger.info(`Auto-thread enabled for channel: ${channel.name} (${channel.id})`);
+
         } catch (error) {
+            logger.error('Error setting auto-thread:', error);
             await interaction.editReply(`❌ Error: ${error.message}`);
         }
     }
