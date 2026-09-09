@@ -10,7 +10,7 @@ import { createEmbed } from '../../utils/embeds.js';
 import { logger } from '../../utils/logger.js';
 import { InteractionHelper } from '../../utils/interactionHelper.js';
 
-const SUPPORT_SERVER_URL = 'https://discord.gg/9xxSjB7yWV';
+const SUPPORT_SERVER_URL = 'https://discord.gg/bc4KqbwjB8';
 
 export default {
   data: new SlashCommandBuilder()
